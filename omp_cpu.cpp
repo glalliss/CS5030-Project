@@ -22,7 +22,7 @@ struct Point
     int cluster;    // no default cluster
     double minDist; // default infinite distance to nearest cluster
     // Initialize a point
-    Point() :
+    Point():
         x(0.0), y(0.0), z(0.0), cluster(-1), minDist(std::numeric_limits<double>::max()) {}
     Point(double x, double y, double z) :
         x(x), y(y), z(z), cluster(-1), minDist(std::numeric_limits<double>::max()) {}
@@ -36,16 +36,23 @@ struct Point
 // Reads in the data.csv file into a vector of points and return vector of points
 std::vector<Point> readcsv()
 {
-    std::vector<Point> points;
+    int DATA_SIZE = 1204026; //This includes the heading line.
+    std::vector<Point> points(DATA_SIZE - 1);
     std::ifstream file("tracks_features.csv");
     std::string line;
     int danceabilityIndex = 9;
     int energyIndex = 10;
     int valenceIndex = 18;
 
-    //line 1 is column titles, lines 2-120426 are data points
-    while (getline(file, line))
+    //line 1 is column titles, lines 2-120426 are data points.
+    #pragma omp parallel for private(line) shared(points)
+    for(int i = 0; i < DATA_SIZE; i++)
     {
+        //I think we not need this critical section if we read the data 
+        // using offsets, but I don't have time right now.
+        #pragma omp critical
+        getline(file, line);
+
         std::stringstream lineStream(line);
         std::vector<std::string> columns;
         while (!lineStream.eof())
@@ -73,12 +80,12 @@ std::vector<Point> readcsv()
             x = stod(columns[danceabilityIndex]);
             y = stod(columns[energyIndex]);
             z = stod(columns[valenceIndex]);
-            points.push_back(Point(x, y, z));
+            points[i]  = Point(x, y, z);
         }
         catch (const std::invalid_argument& e)
         {
             // std::cerr << "Invalid argument: " << e.what() << std::endl;
-            std::cerr << "Skipping first line with column names." << std::endl;
+            std::cerr << "Skipping first line with column names at index " << i << std::endl;
         }
     }
     // The points vector should/will have ~1.2M points to be used with the kMeansClustering function
@@ -108,8 +115,9 @@ void kMeansClustering(std::vector<Point>* points, int epochs, int k, int num_thr
         centroids.push_back(points->at(rand() % n));
     }
     // Run algorithm however many epochs specified
-    
+    for (int i = 0; i < epochs; ++i)
     {
+    std::cerr << "Starting epoch: " << i << std::endl;
         // For each centroid, compute distance from centroid to each point and update point's minDist and cluster if necessary
         for (std::vector<Point>::iterator c = begin(centroids); c != end(centroids); ++c)
         {
