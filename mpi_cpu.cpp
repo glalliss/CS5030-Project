@@ -1,10 +1,5 @@
 // Adapted from https://reasonabledeviations.com/2019/10/02/k-means-in-cpp/
 // Dataset from https://www.kaggle.com/datasets/rodolfofigueroa/spotify-12m-songs
-
-
-/*
-* This version of the program only has a shared memory implementation.
-*/
 #include <ctime>
 #include <fstream>
 #include <iostream>
@@ -13,7 +8,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <omp.h>
+#include <mpi.h>
 
 
 struct Point
@@ -22,7 +17,7 @@ struct Point
     int cluster;    // no default cluster
     double minDist; // default infinite distance to nearest cluster
     // Initialize a point
-    Point():
+    Point() :
         x(0.0), y(0.0), z(0.0), cluster(-1), minDist(std::numeric_limits<double>::max()) {}
     Point(double x, double y, double z) :
         x(x), y(y), z(z), cluster(-1), minDist(std::numeric_limits<double>::max()) {}
@@ -33,26 +28,38 @@ struct Point
     }
 };
 
+MPI_Datatype createPointType() {
+    sendcounts mpiPointType;
+    MPI_Datatype types[4] = {MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT};
+    int blocklengths[4] = {1, 1, 1, 1};
+    MPI_Aint offsets[4];
+
+    // Get the offsets of each member in the struct
+    offsets[0] = offsetof(Point, x);
+    offsets[1] = offsetof(Point, y);
+    offsets[2] = offsetof(Point, z);
+    offsets[3] = offsetof(Point, cluster);
+
+    // Create the MPI datatype for Point
+    MPI_Type_create_struct(4, blocklengths, offsets, types, &mpiPointType);
+    MPI_Type_commit(&mpiPointType);
+
+    return mpiPointType;
+}
+
+
+
 // Reads in the data.csv file into a vector of points and return vector of points
-std::vector<Point> readcsv(int num_threads)
+std::vector<Point> readcsv()
 {
-    int DATA_SIZE = 1204026; //This includes the heading line.
-    std::vector<Point> points(DATA_SIZE - 1);
+    std::vector<Point> points;
     std::ifstream file("tracks_features.csv");
     std::string line;
     int danceabilityIndex = 9;
     int energyIndex = 10;
     int valenceIndex = 18;
-
-    //line 1 is column titles, lines 2-120426 are data points.
-    #pragma omp parallel for private(line) shared(points) num_threads(num_threads)
-    for(int i = 0; i < DATA_SIZE; i++)
+    while (getline(file, line))
     {
-        //I think we oon't need this critical section if we read the data 
-        // using offsets, but I don't have time right now.
-        #pragma omp critical
-        getline(file, line);
-
         std::stringstream lineStream(line);
         std::vector<std::string> columns;
         while (!lineStream.eof())
@@ -80,12 +87,12 @@ std::vector<Point> readcsv(int num_threads)
             x = stod(columns[danceabilityIndex]);
             y = stod(columns[energyIndex]);
             z = stod(columns[valenceIndex]);
-            points[i]  = Point(x, y, z);
+            points.push_back(Point(x, y, z));
         }
         catch (const std::invalid_argument& e)
         {
             // std::cerr << "Invalid argument: " << e.what() << std::endl;
-            std::cerr << "Skipping first line with column names at index " << i << std::endl;
+            std::cerr << "Skipping first line with column names." << std::endl;
         }
     }
     // The points vector should/will have ~1.2M points to be used with the kMeansClustering function
@@ -98,18 +105,13 @@ std::vector<Point> readcsv(int num_threads)
  * @param epochs - number of k means iterations
  * @param k - the number of initial centroids
  */
-
-
-
-//Kernal function: takes a single point
-void kMeansClustering(std::vector<Point>* points, int epochs, int k, int num_threads)
+void kMeansClustering(std::vector<Point>* points, int epochs, int k, int rank, int comm_size)
 {
     int n = points->size();
     // Randomly initialise centroids
     // The index of the centroid within the centroids vector represents the cluster label.
     std::vector<Point> centroids;
     srand(time(0));
-
     for (int i = 0; i < k; ++i)
     {
         centroids.push_back(points->at(rand() % n));
@@ -117,22 +119,15 @@ void kMeansClustering(std::vector<Point>* points, int epochs, int k, int num_thr
     // Run algorithm however many epochs specified
     for (int i = 0; i < epochs; ++i)
     {
-    std::cerr << "Starting epoch: " << i << std::endl;
         // For each centroid, compute distance from centroid to each point and update point's minDist and cluster if necessary
         for (std::vector<Point>::iterator c = begin(centroids); c != end(centroids); ++c)
         {
+            //This line computes the cluster that the points will all be compared to in the nested loop
             int clusterId = c - begin(centroids);
-            //calculate distance for each point
-
-            //This is not the best way to do it. There will be some overhead each epoch to spawn the threads.
-            #pragma omp parallel for num_threads(num_threads) 
             for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
             {
                 Point p = *it;
                 double dist = c->distance(p);
-
-                //update the distance and cluster id
-                #pragma omp critical
                 if (dist < p.minDist)
                 {
                     p.minDist = dist;
@@ -144,18 +139,14 @@ void kMeansClustering(std::vector<Point>* points, int epochs, int k, int num_thr
         // Create vectors to keep track of data needed to compute means
         std::vector<int> nPoints;
         std::vector<double> sumX, sumY, sumZ;
-        #pragma omp single
         for (int j = 0; j < k; ++j)
         {
-            //this simply initializes the vectors to 0
             nPoints.push_back(0);
             sumX.push_back(0.0);
             sumY.push_back(0.0);
             sumZ.push_back(0.0);
         }
         // Iterate over points to append data to centroids
-
-        #pragma omp for
         for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
         {
             int clusterId = it->cluster;
@@ -166,7 +157,6 @@ void kMeansClustering(std::vector<Point>* points, int epochs, int k, int num_thr
             it->minDist = std::numeric_limits<double>::max(); // reset distance
         }
         // Compute the new centroids
-        #pragma omp for
         for (std::vector<Point>::iterator c = begin(centroids); c != end(centroids); ++c)
         {
             int clusterId = c - begin(centroids);
@@ -186,14 +176,34 @@ void kMeansClustering(std::vector<Point>* points, int epochs, int k, int num_thr
     myfile.close();
 }
 
-int main(int argc, char* argv[])
+int main()
 {
-    if (argc != 2){
-        std::cout << "Usage: <number of threads>" << std::endl;
-        return 0;
+    //there are 1204025 points.
+    int NUM_DATA = 1204025;
+    int my_rank, comm_size;
+    int *sendcounts, *displs;
+    std::vector<Point> points, my_points;
+    MPI_Init();
+    MPI_Comm comm = MPI_COMM_WORLD;
+    my_rank = MPI_Comm_rank(comm , &my_rank);
+    comm_size = MPI_Comm_size(comm, &comm_size);
+
+    data_size = NUM_DATA/comm_size;
+    int remaining = NUM_DATA;
+
+    //calculate number of data to send each process
+    for (int i = 0; i < comm_size; ++i) {
+        sendcounts[i] = data_size / comm_size + (i < data_size % comm_size ? 1 : 0);
+        displs[i] = NUM_DATA - remaining;
+        remaining -= sendcounts[i];
     }
-    int num_threads = std::stoi(argv[1]);
-    std::vector<Point> points = readcsv(num_threads);
+
+    if(my_rank == 0){
+        points = readcsv();
+    }
+    MPI_Type mpi_point = createPointType();
+    MPI_Scatterv(points.data(), sendcounts, displs, mpi_point, my_points, sendcounts[my_rank], mpi_point, 0, comm);
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
-    kMeansClustering(&points, 5000, 5, num_threads);
+    kMeansClustering(&points, 5000, 5, my_rank, comm_size);
+    MPI_Finalize();
 }
