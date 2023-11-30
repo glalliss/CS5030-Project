@@ -42,6 +42,8 @@ std::vector<Point> readcsv()
     int danceabilityIndex = 9;
     int energyIndex = 10;
     int valenceIndex = 18;
+
+    //line 1 is column titles, lines 2-120426 are data points
     while (getline(file, line))
     {
         std::stringstream lineStream(line);
@@ -113,6 +115,8 @@ void kMeansClustering(std::vector<Point>* points, int epochs, int k, int num_thr
         {
             int clusterId = c - begin(centroids);
             //calculate distance for each point
+
+            //This is not the best way to do it. There will be some overhead each epoch to spawn the threads.
             #pragma omp parallel for num_threads(num_threads) 
             for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
             {
