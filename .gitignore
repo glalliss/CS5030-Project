@@ -2,3 +2,4 @@ omp_kmeans
 serial
 tracks_features.csv
 .vscode
+output.csv
