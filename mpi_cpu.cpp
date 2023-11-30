@@ -107,7 +107,7 @@ std::vector<Point> readcsv()
  */
 std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int k, int rank, MPI_Comm comm)
 {
-    MPI_Datatype mpi_point = createPointType()
+    MPI_Datatype mpi_point = createPointType();
     int n = points->size();
     // Randomly initialise centroids
     // The index of the centroid within the centroids vector represents the cluster label.
@@ -163,10 +163,10 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
         }
 
         //send counts and sums back to process 0
-        MPI_Reduce(nPoints.data(), nPoints_global ,k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
-        MPI_Reduce(sumX.data(), sumX_global , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
-        MPI_Reduce(sumY.data() , sumY_global , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
-        MPI_Reduce(sumZ.data(), sumZ_global , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
+        MPI_Reduce(nPoints.data(), std::data(nPoints_global) ,k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
+        MPI_Reduce(sumX.data(), std::data(sumX_global) , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
+        MPI_Reduce(sumY.data() , std::data(sumY_global) , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
+        MPI_Reduce(sumZ.data(), std::data(sumZ_global) , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
         
         // Compute the new centroids with agregated data
         if(rank == 0){
@@ -180,13 +180,13 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
         }
 
         //sent centroids back to all processes.
-        MPI_Bcast(centroids, k, mpi_point, 0, comm);
+        MPI_Bcast(centroids.data(), k, mpi_point, 0, comm);
     }
     return *points;
     // Write to csv
 }
 
-void write_csv(std::vector<Point> points){
+void write_csv(std::vector<Point> *points){
     std::ofstream myfile;
     myfile.open("output.csv");
     myfile << "x,y,z,c" << std::endl;
@@ -206,12 +206,15 @@ int main()
     int my_rank, comm_size;
     int *sendcounts, *displs;
     std::vector<Point> points, my_points;
-    MPI_Init();
+    MPI_Init(NULL, NULL);
+    printf("hello\n");
     MPI_Comm comm = MPI_COMM_WORLD;
     my_rank = MPI_Comm_rank(comm , &my_rank);
     comm_size = MPI_Comm_size(comm, &comm_size);
-
-    data_size = NUM_DATA/comm_size;
+    printf("size: %d", comm_size);
+    sendcounts = (int*)malloc(comm_size*sizeof(int));
+    displs = (int*)malloc(comm_size*sizeof(int));
+    int data_size = NUM_DATA/comm_size;
     int remaining = NUM_DATA;
 
     //calculate number of data to send each process
@@ -225,12 +228,12 @@ int main()
         points = readcsv();
     }
     MPI_Datatype mpi_point = createPointType();
-    MPI_Scatterv(points.data(), sendcounts, displs, mpi_point, my_points, sendcounts[my_rank], mpi_point, 0, comm);
+    MPI_Scatterv(points.data(), sendcounts, displs, mpi_point, std::data(my_points), sendcounts[my_rank], mpi_point, 0, comm);
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
-    my_points = kMeansClustering(&my_points, 5000, 5, my_rank, comm_size);
-    MPI_Gatherv(my_points.data(), sendcounts[my_rank], mpi_points, points, sendcounts, displs, mpi_point, 0, comm);
+    my_points = kMeansClustering(&my_points, 5000, 5, my_rank, comm);
+    MPI_Gatherv(my_points.data(), sendcounts[my_rank], mpi_point, std::data(points), sendcounts, displs, mpi_point, 0, comm);
     if(my_rank == 0){
-        write_csv(points);
+        write_csv(&points);
     }
     MPI_Finalize();
 }
