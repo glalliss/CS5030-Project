@@ -96,8 +96,12 @@ std::vector<Point> readcsv()
         }
     }
     // The points vector should/will have ~1.2M points to be used with the kMeansClustering function
+    printf("finished writing\n");
     return points;
 }
+
+
+
 
 /**
  * Perform k-means clustering
@@ -182,6 +186,7 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
         //sent centroids back to all processes.
         MPI_Bcast(centroids.data(), k, mpi_point, 0, comm);
     }
+    printf("Size: %ld\n", points->size());
     return *points;
     // Write to csv
 }
@@ -205,13 +210,11 @@ int main()
     int NUM_DATA = 1204025;
     int my_rank, comm_size;
     int *sendcounts, *displs;
-    std::vector<Point> points, my_points;
+    std::vector<Point> points;
     MPI_Init(NULL, NULL);
-    printf("hello\n");
     MPI_Comm comm = MPI_COMM_WORLD;
-    my_rank = MPI_Comm_rank(comm , &my_rank);
-    comm_size = MPI_Comm_size(comm, &comm_size);
-    printf("size: %d", comm_size);
+    MPI_Comm_rank(comm , &my_rank);
+    MPI_Comm_size(comm, &comm_size);
     sendcounts = (int*)malloc(comm_size*sizeof(int));
     displs = (int*)malloc(comm_size*sizeof(int));
     int data_size = NUM_DATA/comm_size;
@@ -219,19 +222,30 @@ int main()
 
     //calculate number of data to send each process
     for (int i = 0; i < comm_size; ++i) {
-        sendcounts[i] = data_size / comm_size + (i < data_size % comm_size ? 1 : 0);
+        sendcounts[i] = data_size + (i + 1 < data_size % comm_size ? 1 : 0);
         displs[i] = NUM_DATA - remaining;
         remaining -= sendcounts[i];
     }
 
     if(my_rank == 0){
         points = readcsv();
+        printf("Done reading data\n");
+        for (int i = 0; i < comm_size; i++)
+        {
+            printf("%d count: %d\n", i, sendcounts[i]);
+            printf("%d Displacement: %d\n", i, displs[i]);
+        }
+        
     }
+    MPI_Barrier(comm);
     MPI_Datatype mpi_point = createPointType();
-    MPI_Scatterv(points.data(), sendcounts, displs, mpi_point, std::data(my_points), sendcounts[my_rank], mpi_point, 0, comm);
+    printf("type created %d\n", my_rank);
+    std::vector<Point> my_points(sendcounts[my_rank]);
+    printf("%d vector size: %ld\n", my_rank, my_points.size());
+    MPI_Scatterv(points.data(), sendcounts, displs, mpi_point, my_points.data(), sendcounts[my_rank], mpi_point, 0, comm);
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
     my_points = kMeansClustering(&my_points, 5000, 5, my_rank, comm);
-    MPI_Gatherv(my_points.data(), sendcounts[my_rank], mpi_point, std::data(points), sendcounts, displs, mpi_point, 0, comm);
+    MPI_Gatherv(my_points.data(), sendcounts[my_rank], mpi_point, points.data(), sendcounts, displs, mpi_point, 0, comm);
     if(my_rank == 0){
         write_csv(&points);
     }
