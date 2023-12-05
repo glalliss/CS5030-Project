@@ -19,7 +19,7 @@ def visualize(output_csv, output_png):
 
 # visualize([output_csv="output_[HPC_type].csv"], [output_png="[k]_output_[type]_[epochs].png"])
 visualize("output_serial.csv", "5_output_serial_500.png")
-visualize("output_shared_cpu.csv", "5_output_serial_500.png")
-visualize("output_shared_gpu.csv", "5_output_serial_500.png")
-visualize("output_distributed_cpu.csv", "5_output_serial_500.png")
-visualize("output_distributed_gpu.csv", "5_output_serial_500.png")
+visualize("output_shared_cpu.csv", "5_output_shared_cpu_500.png")
+visualize("output_shared_gpu.csv", "5_output_shared_gpu_500.png")
+visualize("output_distributed_cpu.csv", "5_output_distributed_cpu_500.png")
+visualize("output_distributed_gpu.csv", "5_output_distributed_gpu_500.png")

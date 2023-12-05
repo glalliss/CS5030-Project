@@ -32,7 +32,7 @@ struct Point
 };
 
 // Reads in the data.csv file into a vector of points and return vector of points
-std::vector<Point> readcsv(int thread_count)
+std::vector<Point> readcsv(/*int thread_count*/)
 {
     std::cout << "Reading CSV into points" << std::endl;
     int DATA_SIZE = 1204026; //This includes the heading line.
@@ -43,12 +43,12 @@ std::vector<Point> readcsv(int thread_count)
     int energyIndex = 10;
     int valenceIndex = 18;
     //line 1 is column titles, lines 2-120426 are data points.
-    #pragma omp parallel for private(line) shared(points) num_threads(thread_count)
+    // #pragma omp parallel for private(line) shared(points) num_threads(thread_count)
     for(int i = 0; i < DATA_SIZE; i++)
     {
         //I think we not need this critical section if we read the data 
         // using offsets, but I don't have time right now.
-        #pragma omp critical
+        // #pragma omp critical
         getline(file, line);
         std::stringstream lineStream(line);
         std::vector<std::string> columns;
@@ -187,7 +187,7 @@ int main(int argc, char* argv[])
         return 0;
     }
     int thread_count = std::stoi(argv[1]);
-    std::vector<Point> points = readcsv(thread_count);
+    std::vector<Point> points = readcsv(/*thread_count*/);
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
     kMeansClustering(&points, 100, 5, thread_count);
     std::cout << "Finished successfully" << std::endl;

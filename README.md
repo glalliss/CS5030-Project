@@ -40,6 +40,10 @@
 
 ## Validation Function
 - Check that the result from parallel implementations is equal to the serial output implementation
+    - $ g++ validate.cpp -o validate
+    - $ ./validate
 
 ## Visualization
-- testing.py
+- visualization of the output
+    - $ python visualize.py
+    - View output png

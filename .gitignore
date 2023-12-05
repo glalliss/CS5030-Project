@@ -6,3 +6,4 @@ a.out
 output.csv
 tracks_features.csv
 *.csv
+*.png
