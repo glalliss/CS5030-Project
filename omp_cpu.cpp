@@ -34,8 +34,12 @@ struct Point
 // Reads in the data.csv file into a vector of points and return vector of points
 std::vector<Point> readcsv(/*int thread_count*/)
 {
+<<<<<<< HEAD
     std::cout << "Reading CSV into points" << std::endl;
     int DATA_SIZE = 1204026; //This includes the heading line.
+=======
+    int DATA_SIZE = 1204025; //This includes the heading line.
+>>>>>>> mpi_cpu
     std::vector<Point> points(DATA_SIZE - 1);
     std::ifstream file("tracks_features.csv");
     std::string line;
@@ -46,7 +50,7 @@ std::vector<Point> readcsv(/*int thread_count*/)
     // #pragma omp parallel for private(line) shared(points) num_threads(thread_count)
     for(int i = 0; i < DATA_SIZE; i++)
     {
-        //I think we not need this critical section if we read the data 
+        //I think we oon't need this critical section if we read the data 
         // using offsets, but I don't have time right now.
         // #pragma omp critical
         getline(file, line);
