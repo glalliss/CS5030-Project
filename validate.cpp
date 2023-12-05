@@ -1,49 +1,78 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <vector>
-
-bool areFilesSame(const std::vector<std::string>& filenames) {
-    // Open all the files
-    std::vector<std::ifstream> fileStreams;
-    for (const auto& filename : filenames) {
-        std::ifstream file(filename);
-        if (!file.is_open()) {
-            std::cerr << "Error opening file: " << filename << std::endl;
-            return false;
-        }
-        fileStreams.push_back(std::move(file));
-    }
-    // Read and compare lines
-    std::vector<std::string> lines(filenames.size());
-    while (true) {
-        for (size_t i = 0; i < fileStreams.size(); ++i) {
-            if (!std::getline(fileStreams[i], lines[i])) {
-                // End of file reached for one of the files
-                if (i > 0) {
-                    std::cerr << "Files have different number of lines." << std::endl;
-                    return false;
-                }
-                // All files have been read completely
-                return true;
-            }
-        }
-        // Compare lines from all files
-        for (size_t i = 1; i < lines.size(); ++i) {
-            if (lines[i] != lines[0]) {
-                std::cerr << "Files are different at line " << i + 1 << std::endl;
-                return false;
-            }
-        }
-    }
-}
 
 int main() {
-    std::vector<std::string> filenames = {"file1.csv", "file2.csv", "file3.csv", "file4.csv", "file5.csv"};
-    if (areFilesSame(filenames)) {
-        std::cout << "All files are the same line by line." << std::endl;
-    } else {
-        std::cout << "Files are not the same line by line." << std::endl;
+    // Open the serial CSV file
+    std::ifstream file1("output_serial.csv");
+    if (!file1.is_open()) {
+        std::cerr << "Error opening output_serial.csv" << std::endl;
+        return 1;
     }
+    // Open the shared cpu CSV file
+    std::ifstream file2("output_shared_cpu.csv");
+    if (!file2.is_open()) {
+        std::cerr << "Error opening output_shared_cpu.csv" << std::endl;
+        return 1;
+    }
+    // Open the shared gpu CSV file
+    std::ifstream file3("output_shared_gpu.csv");
+    if (!file3.is_open()) {
+        std::cerr << "Error opening output_shared_gpu.csv" << std::endl;
+        return 1;
+    }
+    // Open the distributed cpu CSV file
+    std::ifstream file4("output_distributed_cpu.csv");
+    if (!file4.is_open()) {
+        std::cerr << "Error opening output_distributed_cpu.csv" << std::endl;
+        return 1;
+    }
+    // Open the distributed gpu CSV file
+    std::ifstream file5("output_distributed_gpu.csv");
+    if (!file5.is_open()) {
+        std::cerr << "Error opening output_distributed_gpu.csv" << std::endl;
+        return 1;
+    }
+    // Read and process data from all files
+    std::string line1, line2, line3, line4, line5;
+    try
+    {
+        while (std::getline(file1, line1) && std::getline(file2, line2) && std::getline(file3, line3) && std::getline(file4, line4) && std::getline(file5, line5)) {
+            if (line1 != line2 || line1 != line3 || line1 != line4 || line1 != line5)
+            {
+                std::cout << "Output files are not the same" << std::endl;
+                return 1;
+            }
+            if (line2 != line3 || line2 != line4 || line2 != line5)
+            {
+                std::cout << "Output files are not the same" << std::endl;
+                return 1;
+            }
+            if (line3 != line4 || line3 != line5)
+            {
+                std::cout << "Output files are not the same" << std::endl;
+                return 1;
+            }
+            if (line4 != line5)
+            {
+                std::cout << "Output files are not the same" << std::endl;
+                return 1;
+            }
+        }
+    }
+    catch(const std::exception& e)
+    {
+        // std::cerr << e.what() << '\n';
+        std::cerr << "Output files are not the same" << std::endl;
+        return 1;
+    }
+    std::cout << "Output files are the same!" << std::endl;
+    // Close the files
+    file1.close();
+    file2.close();
+    file3.close();
+    file4.close();
+    file5.close();
+    // Finish successfully
     return 0;
 }
