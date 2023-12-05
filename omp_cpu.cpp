@@ -20,7 +20,7 @@ struct Point
     int cluster;    // no default cluster
     double minDist; // default infinite distance to nearest cluster
     // Initialize a point
-    Point():
+    Point() :
         x(0.0), y(0.0), z(0.0), cluster(-1), minDist(std::numeric_limits<double>::max()) {}
     Point(double x, double y, double z) :
         x(x), y(y), z(z), cluster(-1), minDist(std::numeric_limits<double>::max()) {}
