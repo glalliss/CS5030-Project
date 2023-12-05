@@ -1,5 +1,14 @@
 // Adapted from https://reasonabledeviations.com/2019/10/02/k-means-in-cpp/
 // Dataset from https://www.kaggle.com/datasets/rodolfofigueroa/spotify-12m-songs
+
+/*
+seg fault searching:
+- Type is correct
+- My data count is accurate
+- The sendcounts add up to the total data count
+- Points.data has no problem accessing all items (tested with for loop)
+- Examples online use vector.data the same way I do
+*/
 #include <ctime>
 #include <fstream>
 #include <iostream>
@@ -28,8 +37,7 @@ struct Point
     }
 };
 
-MPI_Datatype createPointType() {
-    MPI_Datatype mpiPointType;
+void createPointType(MPI_Datatype *type) {
     MPI_Datatype types[4] = {MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_INT};
     int blocklengths[4] = {1, 1, 1, 1};
     MPI_Aint offsets[4];
@@ -41,10 +49,12 @@ MPI_Datatype createPointType() {
     offsets[3] = offsetof(Point, cluster);
 
     // Create the MPI datatype for Point
-    MPI_Type_create_struct(4, blocklengths, offsets, types, &mpiPointType);
-    MPI_Type_commit(&mpiPointType);
+    MPI_Type_create_struct(4, blocklengths, offsets, types, type);
 
-    return mpiPointType;
+    if (MPI_Type_commit(type) != MPI_SUCCESS){
+        printf("Type creation failed\n");
+        MPI_Abort( MPI_COMM_WORLD , 1);
+    }
 }
 
 
@@ -53,11 +63,13 @@ MPI_Datatype createPointType() {
 std::vector<Point> readcsv()
 {
     std::vector<Point> points;
-    std::ifstream file("tracks_features.csv");
+    //std::ifstream file("tracks_features.csv");
+    std::ifstream file("testing_code.csv");
     std::string line;
     int danceabilityIndex = 9;
     int energyIndex = 10;
     int valenceIndex = 18;
+    int count = 0;
     while (getline(file, line))
     {
         std::stringstream lineStream(line);
@@ -88,6 +100,7 @@ std::vector<Point> readcsv()
             y = stod(columns[energyIndex]);
             z = stod(columns[valenceIndex]);
             points.push_back(Point(x, y, z));
+            count++;
         }
         catch (const std::invalid_argument& e)
         {
@@ -96,7 +109,7 @@ std::vector<Point> readcsv()
         }
     }
     // The points vector should/will have ~1.2M points to be used with the kMeansClustering function
-    printf("finished writing\n");
+    printf("finished reading. num data points is %d.\n", count);
     return points;
 }
 
@@ -109,9 +122,8 @@ std::vector<Point> readcsv()
  * @param epochs - number of k means iterations
  * @param k - the number of initial centroids
  */
-std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int k, int rank, MPI_Comm comm)
+std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int k, int rank, MPI_Comm comm, MPI_Datatype mpi_point)
 {
-    MPI_Datatype mpi_point = createPointType();
     int n = points->size();
     // Randomly initialise centroids
     // The index of the centroid within the centroids vector represents the cluster label.
@@ -141,6 +153,7 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
                 *it = p;
             }
         }
+        printf("%d here.\n", rank);
         // Create vectors to keep track of data needed to compute means
         std::vector<int> nPoints, nPoints_global;
         std::vector<double> sumX, sumY, sumZ, sumX_global, sumY_global, sumZ_global;
@@ -207,7 +220,7 @@ void write_csv(std::vector<Point> *points){
 int main()
 {
     //there are 1204025 points.
-    int NUM_DATA = 1204025;
+    int NUM_DATA = 1501;
     int my_rank, comm_size;
     int *sendcounts, *displs;
     std::vector<Point> points;
@@ -218,15 +231,20 @@ int main()
     sendcounts = (int*)malloc(comm_size*sizeof(int));
     displs = (int*)malloc(comm_size*sizeof(int));
     int data_size = NUM_DATA/comm_size;
+    printf("%d\n", data_size);
     int remaining = NUM_DATA;
 
     //calculate number of data to send each process
     for (int i = 0; i < comm_size; ++i) {
-        sendcounts[i] = data_size + (i + 1 < data_size % comm_size ? 1 : 0);
+        sendcounts[i] = data_size + (i < NUM_DATA % comm_size ? 1 : 0);
         displs[i] = NUM_DATA - remaining;
         remaining -= sendcounts[i];
     }
+    MPI_Datatype mpi_point;
+    createPointType(&mpi_point);
+    printf("type created %d\n", my_rank);
 
+    std::vector<Point> my_points(sendcounts[my_rank]);
     if(my_rank == 0){
         points = readcsv();
         printf("Done reading data\n");
@@ -235,16 +253,14 @@ int main()
             printf("%d count: %d\n", i, sendcounts[i]);
             printf("%d Displacement: %d\n", i, displs[i]);
         }
-        
     }
     MPI_Barrier(comm);
-    MPI_Datatype mpi_point = createPointType();
-    printf("type created %d\n", my_rank);
-    std::vector<Point> my_points(sendcounts[my_rank]);
-    printf("%d vector size: %ld\n", my_rank, my_points.size());
+    
+    
+
     MPI_Scatterv(points.data(), sendcounts, displs, mpi_point, my_points.data(), sendcounts[my_rank], mpi_point, 0, comm);
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
-    my_points = kMeansClustering(&my_points, 5000, 5, my_rank, comm);
+    my_points = kMeansClustering(&my_points, 5000, 5, my_rank, comm, mpi_point);
     MPI_Gatherv(my_points.data(), sendcounts[my_rank], mpi_point, points.data(), sendcounts, displs, mpi_point, 0, comm);
     if(my_rank == 0){
         write_csv(&points);
