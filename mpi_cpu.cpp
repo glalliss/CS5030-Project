@@ -128,14 +128,18 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
     // Randomly initialise centroids
     // The index of the centroid within the centroids vector represents the cluster label.
     std::vector<Point> centroids;
-    srand(time(0));
+    srand(69);
     for (int i = 0; i < k; ++i)
     {
         centroids.push_back(points->at(rand() % n));
     }
+    printf("%d Starting kmeans\n", rank);
     // Run algorithm however many epochs specified
     for (int i = 0; i < epochs; ++i)
     {
+        if (rank == 0){
+            printf("Starting epoch %d.\n", i);
+        }
         // For each centroid, compute distance from centroid to each point and update point's minDist and cluster if necessary
         for (std::vector<Point>::iterator c = begin(centroids); c != end(centroids); ++c)
         {
@@ -153,7 +157,6 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
                 *it = p;
             }
         }
-        printf("%d here.\n", rank);
         // Create vectors to keep track of data needed to compute means
         std::vector<int> nPoints, nPoints_global;
         std::vector<double> sumX, sumY, sumZ, sumX_global, sumY_global, sumZ_global;
@@ -180,10 +183,10 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
         }
 
         //send counts and sums back to process 0
-        MPI_Reduce(nPoints.data(), std::data(nPoints_global) ,k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
-        MPI_Reduce(sumX.data(), std::data(sumX_global) , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
-        MPI_Reduce(sumY.data() , std::data(sumY_global) , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
-        MPI_Reduce(sumZ.data(), std::data(sumZ_global) , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
+        MPI_Reduce(nPoints.data(), nPoints_global.data() ,k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
+        MPI_Reduce(sumX.data(), sumX_global.data() , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
+        MPI_Reduce(sumY.data() , sumY_global.data() , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
+        MPI_Reduce(sumZ.data(), sumZ_global.data() , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
         
         // Compute the new centroids with agregated data
         if(rank == 0){
@@ -199,7 +202,6 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
         //sent centroids back to all processes.
         MPI_Bcast(centroids.data(), k, mpi_point, 0, comm);
     }
-    printf("Size: %ld\n", points->size());
     return *points;
     // Write to csv
 }
@@ -231,7 +233,6 @@ int main()
     sendcounts = (int*)malloc(comm_size*sizeof(int));
     displs = (int*)malloc(comm_size*sizeof(int));
     int data_size = NUM_DATA/comm_size;
-    printf("%d\n", data_size);
     int remaining = NUM_DATA;
 
     //calculate number of data to send each process
@@ -242,19 +243,12 @@ int main()
     }
     MPI_Datatype mpi_point;
     createPointType(&mpi_point);
-    printf("type created %d\n", my_rank);
 
     std::vector<Point> my_points(sendcounts[my_rank]);
     if(my_rank == 0){
         points = readcsv();
         printf("Done reading data\n");
-        for (int i = 0; i < comm_size; i++)
-        {
-            printf("%d count: %d\n", i, sendcounts[i]);
-            printf("%d Displacement: %d\n", i, displs[i]);
-        }
     }
-    MPI_Barrier(comm);
     
     
 
