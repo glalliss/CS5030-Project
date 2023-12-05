@@ -29,6 +29,7 @@ struct Point
 // Reads in the data.csv file into a vector of points and return vector of points
 std::vector<Point> readcsv()
 {
+    std::cout << "Reading CSV into points" << std::endl;
     std::vector<Point> points;
     std::ifstream file("tracks_features.csv");
     std::string line;
@@ -72,6 +73,7 @@ std::vector<Point> readcsv()
             std::cerr << "Skipping first line with column names." << std::endl;
         }
     }
+    std::cout << "Finished reading CSV into points" << std::endl;
     // The points vector should/will have ~1.2M points to be used with the kMeansClustering function
     return points;
 }
@@ -84,16 +86,18 @@ std::vector<Point> readcsv()
  */
 void kMeansClustering(std::vector<Point>* points, int epochs, int k)
 {
-    int n = points->size();
     // Randomly initialise centroids
+    std::cout << "Randomly initializing centroids" << std::endl;
     // The index of the centroid within the centroids vector represents the cluster label.
     std::vector<Point> centroids;
     srand(time(0));
+    int n = points->size();
     for (int i = 0; i < k; ++i)
     {
         centroids.push_back(points->at(rand() % n));
     }
     // Run algorithm however many epochs specified
+    std::cout << "Running algorithm for " << epochs << " epochs" << std::endl;
     for (int i = 0; i < epochs; ++i)
     {
         // For each centroid, compute distance from centroid to each point and update point's minDist and cluster if necessary
@@ -142,8 +146,9 @@ void kMeansClustering(std::vector<Point>* points, int epochs, int k)
         }
     }
     // Write to csv
+    std::cout << "Writing to CSV" << std::endl;
     std::ofstream myfile;
-    myfile.open("output.csv");
+    myfile.open("output_serial.csv");
     myfile << "x,y,z,c" << std::endl;
     for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
     {
@@ -156,5 +161,6 @@ int main()
 {
     std::vector<Point> points = readcsv();
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
-    kMeansClustering(&points, 5000, 5);
+    kMeansClustering(&points, 500, 5);
+    std::cout << "Finished successfully" << std::endl;
 }

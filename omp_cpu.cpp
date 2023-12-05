@@ -36,6 +36,7 @@ struct Point
 // Reads in the data.csv file into a vector of points and return vector of points
 std::vector<Point> readcsv(int num_threads)
 {
+    std::cout << "Reading CSV into points" << std::endl;
     int DATA_SIZE = 1204026; //This includes the heading line.
     std::vector<Point> points(DATA_SIZE - 1);
     std::ifstream file("tracks_features.csv");
@@ -88,6 +89,7 @@ std::vector<Point> readcsv(int num_threads)
             std::cerr << "Skipping first line with column names at index " << i << std::endl;
         }
     }
+    std::cout << "Finished reading CSV into points" << std::endl;
     // The points vector should/will have ~1.2M points to be used with the kMeansClustering function
     return points;
 }
@@ -104,20 +106,21 @@ std::vector<Point> readcsv(int num_threads)
 //Kernal function: takes a single point
 void kMeansClustering(std::vector<Point>* points, int epochs, int k, int num_threads)
 {
-    int n = points->size();
     // Randomly initialise centroids
+    std::cout << "Randomly initializing centroids" << std::endl;
     // The index of the centroid within the centroids vector represents the cluster label.
     std::vector<Point> centroids;
     srand(time(0));
-
+    int n = points->size();
     for (int i = 0; i < k; ++i)
     {
         centroids.push_back(points->at(rand() % n));
     }
     // Run algorithm however many epochs specified
+    std::cout << "Running algorithm for " << epochs << " epochs" << std::endl;
     for (int i = 0; i < epochs; ++i)
     {
-    std::cerr << "Starting epoch: " << i << std::endl;
+        // std::cerr << "Starting epoch: " << i << std::endl;
         // For each centroid, compute distance from centroid to each point and update point's minDist and cluster if necessary
         for (std::vector<Point>::iterator c = begin(centroids); c != end(centroids); ++c)
         {
@@ -176,8 +179,9 @@ void kMeansClustering(std::vector<Point>* points, int epochs, int k, int num_thr
         }
     }
     // Write to csv
+    std::cout << "Writing to CSV" << std::endl;
     std::ofstream myfile;
-    myfile.open("output.csv");
+    myfile.open("output_shared_cpu.csv");
     myfile << "x,y,z,c" << std::endl;
     for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
     {
@@ -195,5 +199,6 @@ int main(int argc, char* argv[])
     int num_threads = std::stoi(argv[1]);
     std::vector<Point> points = readcsv(num_threads);
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
-    kMeansClustering(&points, 5000, 5, num_threads);
+    kMeansClustering(&points, 500, 5, num_threads);
+    std::cout << "Finished successfully" << std::endl;
 }
