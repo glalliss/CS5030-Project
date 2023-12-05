@@ -36,7 +36,7 @@ struct Point
 // Reads in the data.csv file into a vector of points and return vector of points
 std::vector<Point> readcsv(int num_threads)
 {
-    int DATA_SIZE = 1204026; //This includes the heading line.
+    int DATA_SIZE = 1204025; //This includes the heading line.
     std::vector<Point> points(DATA_SIZE - 1);
     std::ifstream file("tracks_features.csv");
     std::string line;
@@ -80,7 +80,7 @@ std::vector<Point> readcsv(int num_threads)
             x = stod(columns[danceabilityIndex]);
             y = stod(columns[energyIndex]);
             z = stod(columns[valenceIndex]);
-            points[i]  = Point(x, y, z);
+            points[i-1]  = Point(x, y, z);
         }
         catch (const std::invalid_argument& e)
         {

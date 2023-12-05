@@ -65,7 +65,7 @@ std::vector<Point> readcsv()
 {
     std::vector<Point> points;
     //std::ifstream file("tracks_features.csv");
-    std::ifstream file("testing_code.csv");
+    std::ifstream file("tracks_features.csv");
     std::string line;
     int danceabilityIndex = 9;
     int energyIndex = 10;
@@ -148,7 +148,7 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
     {
         std::vector<Point> centroids(centroid_array, centroid_array + k);        
         if (rank == 0){
-            //printf("Starting epoch %d.\n", i);
+            printf("Starting epoch %d.\n", i);
         }
         // For each centroid, compute distance from centroid to each point and update point's minDist and cluster if necessary
         for (std::vector<Point>::iterator c = begin(centroids); c != end(centroids); ++c)
@@ -168,23 +168,33 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
             }
             //printf("%d done with cluster %d\n", rank, clusterId);
         }
-        //printf("%d done with epoch %d\n", rank, i);
+        printf("%d done with epoch %d\n", rank, i);
         // Create vectors to keep track of data needed to compute means
-        std::vector<int> nPoints, nPoints_global;
-        std::vector<double> sumX, sumY, sumZ, sumX_global, sumY_global, sumZ_global;
 
-        //This code working
+        int nPoints[k];
+        int nPoints_global[k];
+        double sumX[k];
+        double sumY[k];
+        double sumZ[k];
+        double sumX_global[k];
+        double sumY_global[k];
+        double sumZ_global[k];
+
+        // Initialize arrays
         for (int j = 0; j < k; ++j)
         {
-            nPoints.push_back(0);
-            nPoints_global.push_back(0);
-            sumX_global.push_back(0.0);
-            sumY_global.push_back(0.0);
-            sumZ_global.push_back(0.0);
-            sumX.push_back(0.0);
-            sumY.push_back(0.0);
-            sumZ.push_back(0.0);
+            nPoints[j] = 0;
+            nPoints_global[j] = 0;
+            sumX_global[j] = 0.0;
+            sumY_global[j] = 0.0;
+            sumZ_global[j] = 0.0;
+            sumX[j] = 0.0;
+            sumY[j] = 0.0;
+            sumZ[j] = 0.0;
         }
+
+        printf("%d arrays initialized\n", rank);
+
         // Iterate over points to append data to centroids
         for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
         {
@@ -195,37 +205,44 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
             sumZ[clusterId] += it->z;
             it->minDist = std::numeric_limits<double>::max(); // reset distance
         }
-            //printf("%d vectors filled\n", rank);
+
+        // Use the arrays as needed
+
+        
 
         //send counts and sums back to process 0
-        MPI_Reduce(nPoints.data(), nPoints_global.data() ,k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
-        MPI_Reduce(sumX.data(), sumX_global.data() , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
-        MPI_Reduce(sumY.data() , sumY_global.data() , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
-        MPI_Reduce(sumZ.data(), sumZ_global.data() , k , MPI_INTEGER  , MPI_SUM  , 0 , comm);
-        //printf("%d reduction successful\n", rank);
+        MPI_Reduce(nPoints, nPoints_global, k, MPI_INT, MPI_SUM, 0, comm);
+        MPI_Reduce(sumX, sumX_global, k, MPI_DOUBLE, MPI_SUM, 0, comm);
+        MPI_Reduce(sumY, sumY_global, k, MPI_DOUBLE, MPI_SUM, 0, comm);
+        MPI_Reduce(sumZ, sumZ_global, k, MPI_DOUBLE, MPI_SUM, 0, comm);
+        printf("%d reduction successful\n", rank);
         
         // Compute the new centroids with agregated data
         if(rank == 0){
+            
             for (std::vector<Point>::iterator c = begin(centroids); c != end(centroids); ++c)
             {
+
                 int clusterId = c - begin(centroids);
+                printf("x: %f ", sumX_global[clusterId]);
                 c->x = sumX_global[clusterId] / nPoints_global[clusterId];
                 c->y = sumY_global[clusterId] / nPoints_global[clusterId];
                 c->z = sumZ_global[clusterId] / nPoints_global[clusterId];
             }
+            printf("New clusters calculated\n");
+            for (int pt = 0; pt < k; pt++)
+            {
+                centroid_array[pt] = centroids[pt];
+            }
+            printf("New centroids ready to be sent.\n");
         }
 
         //sent centroids back to all processes.
-        if (rank == 0){
-            for (int pt = 0; pt < k; pt++)
-            {
-                centroid_array[pt] = centroids[i];
-            }
-            
-        }
         centroids.clear();
         MPI_Bcast(centroid_array, k, mpi_point, 0, comm);
+        printf("New centroids broadcast!");
     }
+    printf("Kmeans complete!");
     return *points;
     // Write to csv
 }
@@ -234,6 +251,7 @@ void write_csv(std::vector<Point> *points){
     std::ofstream myfile;
     myfile.open("output.csv");
     myfile << "x,y,z,c" << std::endl;
+    printf("writing...");
     for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
     {
         myfile << it->x << "," << it->y << "," << it->z << "," << it->cluster << std::endl;
@@ -246,7 +264,7 @@ void write_csv(std::vector<Point> *points){
 int main()
 {
     //there are 1204025 points.
-    int NUM_DATA = 1501;
+    int NUM_DATA = 1204025;
     int my_rank, comm_size;
     int *sendcounts, *displs;
     std::vector<Point> all_points;
@@ -268,7 +286,6 @@ int main()
     MPI_Datatype mpi_point;
     createPointType(&mpi_point);
 
-    std::vector<Point> my_points(sendcounts[my_rank]);
     if(my_rank == 0){
         all_points = readcsv();
         printf("Done reading data\n");
@@ -278,8 +295,11 @@ int main()
 
     MPI_Scatterv(all_points.data(), sendcounts, displs, mpi_point, my_points.data(), sendcounts[my_rank], mpi_point, 0, comm);
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
-    my_points = kMeansClustering(&my_points, 5000, 5, my_rank, comm, mpi_point);
+    std::vector<Point> my_points(sendcounts[my_rank]);
+    
+    my_points = kMeansClustering(&my_points, 10, 5, my_rank, comm, mpi_point);
     MPI_Gatherv(my_points.data(), sendcounts[my_rank], mpi_point, all_points.data(), sendcounts, displs, mpi_point, 0, comm);
+    printf("Gather successful %d", my_rank);
     if(my_rank == 0){
         write_csv(&all_points);
     }
