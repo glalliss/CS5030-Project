@@ -1,7 +1,6 @@
 // Adapted from https://reasonabledeviations.com/2019/10/02/k-means-in-cpp/
 // Dataset from https://www.kaggle.com/datasets/rodolfofigueroa/spotify-12m-songs
 
-
 /*
 * This version of the program only has a shared memory implementation.
 */
@@ -14,7 +13,6 @@
 #include <string>
 #include <vector>
 #include <omp.h>
-
 
 struct Point
 {
@@ -34,7 +32,7 @@ struct Point
 };
 
 // Reads in the data.csv file into a vector of points and return vector of points
-std::vector<Point> readcsv(int num_threads)
+std::vector<Point> readcsv(int thread_count)
 {
     std::cout << "Reading CSV into points" << std::endl;
     int DATA_SIZE = 1204026; //This includes the heading line.
@@ -44,16 +42,14 @@ std::vector<Point> readcsv(int num_threads)
     int danceabilityIndex = 9;
     int energyIndex = 10;
     int valenceIndex = 18;
-
     //line 1 is column titles, lines 2-120426 are data points.
-    #pragma omp parallel for private(line) shared(points) num_threads(num_threads)
+    #pragma omp parallel for private(line) shared(points) num_threads(thread_count)
     for(int i = 0; i < DATA_SIZE; i++)
     {
         //I think we not need this critical section if we read the data 
         // using offsets, but I don't have time right now.
         #pragma omp critical
         getline(file, line);
-
         std::stringstream lineStream(line);
         std::vector<std::string> columns;
         while (!lineStream.eof())
@@ -81,7 +77,7 @@ std::vector<Point> readcsv(int num_threads)
             x = stod(columns[danceabilityIndex]);
             y = stod(columns[energyIndex]);
             z = stod(columns[valenceIndex]);
-            points[i]  = Point(x, y, z);
+            points[i-1]  = Point(x, y, z);
         }
         catch (const std::invalid_argument& e)
         {
@@ -100,17 +96,14 @@ std::vector<Point> readcsv(int num_threads)
  * @param epochs - number of k means iterations
  * @param k - the number of initial centroids
  */
-
-
-
 //Kernal function: takes a single point
-void kMeansClustering(std::vector<Point>* points, int epochs, int k, int num_threads)
+void kMeansClustering(std::vector<Point>* points, int epochs, int k, int thread_count)
 {
     // Randomly initialise centroids
     std::cout << "Randomly initializing centroids" << std::endl;
     // The index of the centroid within the centroids vector represents the cluster label.
     std::vector<Point> centroids;
-    srand(time(0));
+    srand(100);
     int n = points->size();
     for (int i = 0; i < k; ++i)
     {
@@ -126,14 +119,12 @@ void kMeansClustering(std::vector<Point>* points, int epochs, int k, int num_thr
         {
             int clusterId = c - begin(centroids);
             //calculate distance for each point
-
             //This is not the best way to do it. There will be some overhead each epoch to spawn the threads.
-            #pragma omp parallel for num_threads(num_threads) 
+            #pragma omp parallel for num_threads(thread_count) 
             for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
             {
                 Point p = *it;
                 double dist = c->distance(p);
-
                 //update the distance and cluster id
                 #pragma omp critical
                 if (dist < p.minDist)
@@ -157,7 +148,6 @@ void kMeansClustering(std::vector<Point>* points, int epochs, int k, int num_thr
             sumZ.push_back(0.0);
         }
         // Iterate over points to append data to centroids
-
         #pragma omp for
         for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
         {
@@ -196,9 +186,9 @@ int main(int argc, char* argv[])
         std::cout << "Usage: <number of threads>" << std::endl;
         return 0;
     }
-    int num_threads = std::stoi(argv[1]);
-    std::vector<Point> points = readcsv(num_threads);
+    int thread_count = std::stoi(argv[1]);
+    std::vector<Point> points = readcsv(thread_count);
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
-    kMeansClustering(&points, 500, 5, num_threads);
+    kMeansClustering(&points, 100, 5, thread_count);
     std::cout << "Finished successfully" << std::endl;
 }

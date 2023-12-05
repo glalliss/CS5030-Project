@@ -25,7 +25,7 @@
 - 4 vs 5
 
 ## Validation Function
-- check that the result from parallel implementations is equal to the serial output implementation
+- Check that the result from parallel implementations is equal to the serial output implementation
 
 ## Visualization
 - testing.py

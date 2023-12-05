@@ -1,6 +1,8 @@
-omp_kmeans
-serial
-tracks_features.csv
 .vscode
-output.csv
+omp_kmeans
+omp
+serial
 a.out
+output.csv
+tracks_features.csv
+*.csv

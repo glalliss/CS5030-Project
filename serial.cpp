@@ -90,7 +90,7 @@ void kMeansClustering(std::vector<Point>* points, int epochs, int k)
     std::cout << "Randomly initializing centroids" << std::endl;
     // The index of the centroid within the centroids vector represents the cluster label.
     std::vector<Point> centroids;
-    srand(time(0));
+    srand(100);
     int n = points->size();
     for (int i = 0; i < k; ++i)
     {
@@ -161,6 +161,6 @@ int main()
 {
     std::vector<Point> points = readcsv();
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
-    kMeansClustering(&points, 500, 5);
+    kMeansClustering(&points, 100, 5);
     std::cout << "Finished successfully" << std::endl;
 }
