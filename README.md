@@ -35,6 +35,23 @@
     - 
 
 ## Scaling study experiments where you compare implementations:
+All of these were ran on 100 epochs
+
+Serial: 32.126825 seconds
+
+OpenMP:
+
+MPI: 
+
+| Number of cores | Time for mpi section |
+| --- | ---|
+| 2 | 25.305014 |
+| 4 | 18.232265 |
+| 8 | 14.718279 |
+| 16 | 13.123988 | 
+| 32 | 12.392990 |
+
+
 - 1 vs 2 vs 3 (note: you don't need a scaling study for GPUs, you can look instead at different block/tile size)
 - 4 vs 5
 
