@@ -47,3 +47,4 @@
 - visualization of the output
     - $ python visualize.py
     - View output png
+    - Run AFTER one of the kmeans implementations.

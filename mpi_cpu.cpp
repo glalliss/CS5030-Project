@@ -145,7 +145,6 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
     {
         std::vector<Point> centroids(centroid_array, centroid_array + k);        
         if (rank == 0){
-            printf("Starting epoch %d.\n", i);
         }
         // For each centroid, compute distance from centroid to each point and update point's minDist and cluster if necessary
         for (std::vector<Point>::iterator c = begin(centroids); c != end(centroids); ++c)
@@ -218,7 +217,6 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
             {
 
                 int clusterId = c - begin(centroids);
-                printf("x: %f ", sumX_global[clusterId]);
                 c->x = sumX_global[clusterId] / nPoints_global[clusterId];
                 c->y = sumY_global[clusterId] / nPoints_global[clusterId];
                 c->z = sumZ_global[clusterId] / nPoints_global[clusterId];
@@ -233,7 +231,6 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
         centroids.clear();
         MPI_Bcast(centroid_array, k, mpi_point, 0, comm);
     }
-    printf("Kmeans complete!");
     return *points;
     // Write to csv
 }
@@ -282,16 +279,25 @@ int main()
         printf("Done reading data\n");
     }
     
-    
+    double start_time = MPI_Wtime();
     std::vector<Point> my_points(sendcounts[my_rank]);
     MPI_Scatterv(all_points.data(), sendcounts, displs, mpi_point, my_points.data(), sendcounts[my_rank], mpi_point, 0, comm);
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
+    if(my_rank == 0){
+        printf("Starting k means\n");
+    }
     
     my_points = kMeansClustering(&my_points, 100, 5, my_rank, comm, mpi_point);
     MPI_Gatherv(my_points.data(), sendcounts[my_rank], mpi_point, all_points.data(), sendcounts, displs, mpi_point, 0, comm);
-    printf("Gather successful %d", my_rank);
+    double end_time = MPI_Wtime();
+
+    double total_time = end_time - start_time;
+    if (my_rank == 1){
+        printf("Time for mpi section: %f\n", total_time);
+    }
     if(my_rank == 0){
         write_csv(&all_points);
     }
     MPI_Finalize();
+
 }

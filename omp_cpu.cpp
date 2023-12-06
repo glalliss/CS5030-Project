@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 #include <omp.h>
+#include <time.h>
 
 struct Point
 {
@@ -120,7 +121,9 @@ void kMeansClustering(std::vector<Point>* points, int epochs, int k, int thread_
             int clusterId = c - begin(centroids);
             //calculate distance for each point
             //This is not the best way to do it. There will be some overhead each epoch to spawn the threads.
-            #pragma omp parallel for num_threads(thread_count) 
+            #pragma omp parallel num_threads(thread_count)
+            {
+            #pragma omp for 
             for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
             {
                 Point p = *it;
@@ -167,17 +170,18 @@ void kMeansClustering(std::vector<Point>* points, int epochs, int k, int thread_
             c->y = sumY[clusterId] / nPoints[clusterId];
             c->z = sumZ[clusterId] / nPoints[clusterId];
         }
+        }
     }
     // Write to csv
-    std::cout << "Writing to CSV" << std::endl;
-    std::ofstream myfile;
-    myfile.open("output_shared_cpu.csv");
-    myfile << "x,y,z,c" << std::endl;
-    for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
-    {
-        myfile << it->x << "," << it->y << "," << it->z << "," << it->cluster << std::endl;
-    }
-    myfile.close();
+    // std::cout << "Writing to CSV" << std::endl;
+    // std::ofstream myfile;
+    // myfile.open("output_shared_cpu.csv");
+    // myfile << "x,y,z,c" << std::endl;
+    // for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
+    // {
+    //     myfile << it->x << "," << it->y << "," << it->z << "," << it->cluster << std::endl;
+    // }
+    // myfile.close();
 }
 
 int main(int argc, char* argv[])
@@ -186,9 +190,18 @@ int main(int argc, char* argv[])
         std::cout << "Usage: <number of threads>" << std::endl;
         return 0;
     }
-    int thread_count = std::stoi(argv[1]);
+    //int thread_count = std::stoi(argv[1]);
     std::vector<Point> points = readcsv(/*thread_count*/);
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
-    kMeansClustering(&points, 100, 5, thread_count);
+    for (size_t i = 2; i < 8; i++)
+    {
+        clock_t start_time = clock();
+        kMeansClustering(&points, 100, 5, i);
+        clock_t end_time = clock();
+
+        double iteration_time = static_cast<double>(end_time - start_time) / CLOCKS_PER_SEC;
+        printf("%f ", iteration_time);
+    }
+    
     std::cout << "Finished successfully" << std::endl;
 }
