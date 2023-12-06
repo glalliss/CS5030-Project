@@ -37,9 +37,26 @@
 ## Scaling study experiments where you compare implementations:
 All of these were ran on 100 epochs
 
-Serial: 32.126825 seconds
+# Serial: 
+32.126825 seconds
 
-OpenMP:
+# OpenMP:
+
+| Number of cores | Time for mpi section |
+| --- | --- |
+| 2 | 56.696950 |
+| 4 | 81.555408 |
+| 8 | 92.022627 |
+| 16 | 70.868146 | 
+| 32 | 45.040339 |
+
+There is probably an issue with our implementation that is making it take this long. Based on this trend, it is possible that an even higher number of cores would begin to show impovement over the serial version.
+
+GPU:
+
+
+
+
 
 MPI: 
 
@@ -51,12 +68,13 @@ MPI:
 | 16 | 13.123988 | 
 | 32 | 12.392990 |
 
+MPI had a large improvement over the serial version. We can see that as the number of cores increased, the speedup obtained decreased.
 
 - 1 vs 2 vs 3 (note: you don't need a scaling study for GPUs, you can look instead at different block/tile size)
 - 4 vs 5
 
 ## Validation Function
-- Check that the result from parallel implementations is equal to the serial output implementation
+- Check that the result from parallel implementations is equal to the serial output implementation. Only run this after producing output from all the other programs.
     - $ g++ validate.cpp -o validate
     - $ ./validate
 
