@@ -44,7 +44,7 @@ OpenMP:
 MPI: 
 
 | Number of cores | Time for mpi section |
-| --- | ---|
+| --- | --- |
 | 2 | 25.305014 |
 | 4 | 18.232265 |
 | 8 | 14.718279 |
