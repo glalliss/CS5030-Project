@@ -140,9 +140,6 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
         }
     }
     MPI_Bcast( centroid_array , k , mpi_point , 0 , comm);
-    printf("%d bcast successful\n", rank);
-        
-    printf("%d Starting kmeans\n", rank);
     // Run algorithm however many epochs specified
     for (int i = 0; i < epochs; ++i)
     {
@@ -168,7 +165,6 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
             }
             //printf("%d done with cluster %d\n", rank, clusterId);
         }
-        printf("%d done with epoch %d\n", rank, i);
         // Create vectors to keep track of data needed to compute means
 
         int nPoints[k];
@@ -193,7 +189,6 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
             sumZ[j] = 0.0;
         }
 
-        printf("%d arrays initialized\n", rank);
 
         // Iterate over points to append data to centroids
         for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
@@ -215,7 +210,6 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
         MPI_Reduce(sumX, sumX_global, k, MPI_DOUBLE, MPI_SUM, 0, comm);
         MPI_Reduce(sumY, sumY_global, k, MPI_DOUBLE, MPI_SUM, 0, comm);
         MPI_Reduce(sumZ, sumZ_global, k, MPI_DOUBLE, MPI_SUM, 0, comm);
-        printf("%d reduction successful\n", rank);
         
         // Compute the new centroids with agregated data
         if(rank == 0){
@@ -229,18 +223,15 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
                 c->y = sumY_global[clusterId] / nPoints_global[clusterId];
                 c->z = sumZ_global[clusterId] / nPoints_global[clusterId];
             }
-            printf("New clusters calculated\n");
             for (int pt = 0; pt < k; pt++)
             {
                 centroid_array[pt] = centroids[pt];
             }
-            printf("New centroids ready to be sent.\n");
         }
 
         //sent centroids back to all processes.
         centroids.clear();
         MPI_Bcast(centroid_array, k, mpi_point, 0, comm);
-        printf("New centroids broadcast!");
     }
     printf("Kmeans complete!");
     return *points;
@@ -292,12 +283,11 @@ int main()
     }
     
     
-
+    std::vector<Point> my_points(sendcounts[my_rank]);
     MPI_Scatterv(all_points.data(), sendcounts, displs, mpi_point, my_points.data(), sendcounts[my_rank], mpi_point, 0, comm);
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
-    std::vector<Point> my_points(sendcounts[my_rank]);
     
-    my_points = kMeansClustering(&my_points, 10, 5, my_rank, comm, mpi_point);
+    my_points = kMeansClustering(&my_points, 100, 5, my_rank, comm, mpi_point);
     MPI_Gatherv(my_points.data(), sendcounts[my_rank], mpi_point, all_points.data(), sendcounts, displs, mpi_point, 0, comm);
     printf("Gather successful %d", my_rank);
     if(my_rank == 0){
