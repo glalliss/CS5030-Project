@@ -8,11 +8,10 @@
 #include <sstream>
 #include <string>
 #include <vector>
-
+#include <chrono>
 const int k = 5;
-const int epochs = 5000;
+const int epochs = 100;
 struct Point {
-    // ... (same as in the original code)
     double x, y, z; // coordinates
     int cluster;    // no default cluster
     double minDist; // default infinite distance to nearest cluster
@@ -21,7 +20,6 @@ struct Point {
         x(0.0), y(0.0), z(0.0), cluster(-1), minDist(std::numeric_limits<double>::max()) {}
     Point(double x, double y, double z) :
         x(x), y(y), z(z), cluster(-1), minDist(std::numeric_limits<double>::max()) {}
-    // Computes the (square) euclidean distance between this point and another
     
 };
 // Computes the (square) euclidean distance between this point and another
@@ -31,6 +29,7 @@ __device__ double distance(Point p1, Point p2) {
            (p1.z - p2.z) * (p1.z - p2.z);
 }
 
+// kernel functiin to assign clusters to points
 __global__ void assignPointsToClusters(Point* points, int numPoints, Point* centroids, int k, double maxout) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index < numPoints) {
@@ -50,6 +49,7 @@ __global__ void assignPointsToClusters(Point* points, int numPoints, Point* cent
     }
 }
 
+// helper kernel function to compute the mean for each cluster
 __global__ void computeNewCentroids(Point* points, int numPoints, Point* centroids, int k, int* nPoints, double* sumX, double* sumY, double* sumZ) {
     int clusterId = blockIdx.x * blockDim.x + threadIdx.x;
     if (clusterId < k) {
@@ -72,22 +72,12 @@ __global__ void computeNewCentroids(Point* points, int numPoints, Point* centroi
         }
     }
 }
-
+// kernel function to compute the mean for each cluster and update its centroid
 __global__ void updateNewCentroids(Point* centroids,int* nPoints, double* sumX, double* sumY, double* sumZ) {
     int clusterId = blockIdx.x * blockDim.x + threadIdx.x;
     centroids[clusterId].x = sumX[clusterId] / nPoints[clusterId];
     centroids[clusterId].y = sumY[clusterId] / nPoints[clusterId];
     centroids[clusterId].z = sumZ[clusterId] / nPoints[clusterId];
-
-/*
-    for (std::vector<Point>::iterator c = centroids->begin(); c != centroids->end(); ++c)
-        {
-            int clusterId = c - centroids->begin();
-            c->x = sumX[clusterId] / nPoints[clusterId];
-            c->y = sumY[clusterId] / nPoints[clusterId];
-            c->z = sumZ[clusterId] / nPoints[clusterId];
-        }
-*/
 }
 
 
@@ -95,7 +85,7 @@ __global__ void updateNewCentroids(Point* centroids,int* nPoints, double* sumX, 
 std::vector<Point> readcsv()
 {
     std::vector<Point> points;
-    std::ifstream file("/uufs/chpc.utah.edu/common/home/u6055261/tracks_features.csv");
+    std::ifstream file("tracks_features.csv");
     std::string line;
     int danceabilityIndex = 9;
     int energyIndex = 10;
@@ -147,7 +137,6 @@ std::vector<Point> readcsv()
 
 
 int main() {
-    // ... (same as in the original code)
     std::vector<Point> data = readcsv();
     std::vector<Point>* points = &data;
 
@@ -156,21 +145,22 @@ int main() {
     std::cout << n << std::endl;
     // Randomly initialise centroids
     // The index of the centroid within the centroids vector represents the cluster label.
-    std::vector<Point> centroids;
-    srand(time(0));
+    std::vector<Point> centroids_data;
+    srand(100);
     for (int i = 0; i < k; ++i)
     {
-        centroids.push_back(points->at(rand() % n));
+        centroids_data.push_back(points->at(rand() % n));
     }
+    std::vector<Point>* centroids = &centroids_data;
 
     // Allocate GPU memory
     Point* d_points;
-    cudaMalloc((void**)&d_points, sizeof(Point) * n);
+    cudaMalloc((void**)&d_points, sizeof(Point) * numPoints);
     cudaMemcpy(d_points, points->data(), sizeof(Point) * n, cudaMemcpyHostToDevice);
 
     Point* d_centroids;
     cudaMalloc((void**)&d_centroids, sizeof(Point) * k);
-    cudaMemcpy(d_centroids, &centroids, sizeof(Point) * k, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_centroids, centroids->data(), sizeof(Point) * k, cudaMemcpyHostToDevice);
 
     int* d_nPoints;
     cudaMalloc((void**)&d_nPoints, sizeof(int) * k);
@@ -188,18 +178,18 @@ int main() {
     cudaMalloc((void**)&d_sumZ, sizeof(double) * k);
     cudaMemset(d_sumZ, 0, sizeof(double) * k);
 
-    
+    std::cout << "Running algorithm for " << epochs << " epochs" << std::endl;
+    auto start_time = std::chrono::high_resolution_clock::now();
 
     // Run k-means clustering on GPU
     for (int i = 0; i < epochs; ++i) {
 
         cudaDeviceSynchronize();
         // Assign points to clusters
-        assignPointsToClusters<<<(numPoints + 255) / 256, 256>>>(d_points, numPoints, d_centroids, k, std::numeric_limits<double>::max());
+        assignPointsToClusters<<<ceil(1204025.0 / 256), 256>>>(d_points, numPoints, d_centroids, k, std::numeric_limits<double>::max());
 
         // Synchronize to ensure the previous kernel is finished
         cudaDeviceSynchronize();
-        //std::cout << "part1" << std::endl;
 
         // Compute new centroids
         cudaMemset(d_nPoints, 0, sizeof(int) * k);
@@ -212,29 +202,22 @@ int main() {
         // Synchronize to ensure the previous kernel is finished
         cudaDeviceSynchronize();
 
-        //std::cout << "part2" << std::endl;
-
         updateNewCentroids<<<k, 1>>>(d_centroids,d_nPoints, d_sumX, d_sumY, d_sumZ);
 
         cudaDeviceSynchronize();
 
-        //std::cout << "part3" << std::endl;
-
-
-        // Update centroids on the host
-        //cudaMemcpy(&centroids, d_centroids, sizeof(Point) * k, cudaMemcpyDeviceToHost);
-        //cudaMemcpy(&centroids, d_centroids, sizeof(Point) * k, cudaMemcpyDeviceToHost);
-
-        // ... (same as in the original code)
     }
-    // Update centroids on the host
-    cudaMemcpy(&centroids, d_centroids, sizeof(Point) * k, cudaMemcpyDeviceToHost);
-    cudaMemcpy(points->data(), d_points, sizeof(Point) * n, cudaMemcpyDeviceToHost);
-
-    // ... (same as in the original code)
+    // Update the data points with their centroids on the host
+    cudaMemcpy(points->data(), d_points, sizeof(Point) * numPoints, cudaMemcpyDeviceToHost);
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    long time = elapsed_time.count();
+    double secs = ((double)time) / (1000 * 1000);
+    std::cout << "Duration : " << secs << std::endl;
     // Write to csv
+    std::cout << "Writing to CSV" << std::endl;
     std::ofstream myfile;
-    myfile.open("output.csv");
+    myfile.open("output_shared_gpu.csv");
     myfile << "x,y,z,c" << std::endl;
     for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
     {
@@ -249,6 +232,7 @@ int main() {
     cudaFree(d_sumX);
     cudaFree(d_sumY);
     cudaFree(d_sumZ);
+    std::cout << "Finished successfully" << std::endl;
 
     return 0;
 }
