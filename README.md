@@ -13,7 +13,7 @@
     - $ g++ -fopenmp omp_cpu.cpp -o omp
     - $ ./omp (number of threads)
 - Description the approach used for each of the following implementations
-    - The data is read in by the main thread, then open mpi is initiated for the k means algorithm. Unfortunately, the best stratagy we could come up with was to create threads for each epoch of the k means clustering, which most likely has some overhead. Once the algorithm is finished, the threads are killed and the main thread writes the output data.
+    - The data is read in by the main thread, then open mp is initiated for the k means algorithm. Unfortunately, the best stratagy we could come up with was to create threads for each epoch of the k means clustering, which most likely has some overhead. Once the algorithm is finished, the threads are killed and the main thread writes the output data.
 
 ## 3. Parallel shared memory GPU
 - Code with instructions on how to build and execute all the implementations
