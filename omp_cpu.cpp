@@ -34,12 +34,8 @@ struct Point
 // Reads in the data.csv file into a vector of points and return vector of points
 std::vector<Point> readcsv(/*int thread_count*/)
 {
-<<<<<<< HEAD
     std::cout << "Reading CSV into points" << std::endl;
     int DATA_SIZE = 1204026; //This includes the heading line.
-=======
-    int DATA_SIZE = 1204025; //This includes the heading line.
->>>>>>> mpi_cpu
     std::vector<Point> points(DATA_SIZE - 1);
     std::ifstream file("tracks_features.csv");
     std::string line;
