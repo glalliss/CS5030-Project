@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <iterator>
 #include <omp.h>
 #include <time.h>
 
@@ -98,7 +99,8 @@ std::vector<Point> readcsv(/*int thread_count*/)
  * @param k - the number of initial centroids
  */
 //Kernal function: takes a single point
-void kMeansClustering(std::vector<Point>* points, int epochs, int k, int thread_count)
+
+std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int k, int thread_count)
 {
     // Randomly initialise centroids
     std::cout << "Randomly initializing centroids" << std::endl;
@@ -108,80 +110,85 @@ void kMeansClustering(std::vector<Point>* points, int epochs, int k, int thread_
     int n = points->size();
     for (int i = 0; i < k; ++i)
     {
-        centroids.push_back(points->at(rand() % n));
+        centroids.push_back((*points)[rand() % n]);
     }
+
     // Run algorithm however many epochs specified
     std::cout << "Running algorithm for " << epochs << " epochs" << std::endl;
     for (int i = 0; i < epochs; ++i)
     {
-        // std::cerr << "Starting epoch: " << i << std::endl;
         // For each centroid, compute distance from centroid to each point and update point's minDist and cluster if necessary
-        for (std::vector<Point>::iterator c = begin(centroids); c != end(centroids); ++c)
+        #pragma omp parallel num_threads(thread_count)
         {
-            int clusterId = c - begin(centroids);
-            //calculate distance for each point
-            //This is not the best way to do it. There will be some overhead each epoch to spawn the threads.
-            #pragma omp parallel num_threads(thread_count)
-            {
             #pragma omp for 
-            for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
+            for (int cIndex = 0; cIndex < k; ++cIndex)
             {
-                Point p = *it;
-                double dist = c->distance(p);
-                //update the distance and cluster id
-                #pragma omp critical
-                if (dist < p.minDist)
+                int clusterId = cIndex;
+                //calculate distance for each point
+                for (int itIndex = 0; itIndex < points->size(); ++itIndex)
                 {
-                    p.minDist = dist;
-                    p.cluster = clusterId;
+                    Point p = (*points)[itIndex];
+                    double dist = centroids[clusterId].distance(p);
+                    //update the distance and cluster id
+                    #pragma omp critical
+                    if (dist < p.minDist)
+                    {
+                        p.minDist = dist;
+                        p.cluster = clusterId;
+                    }
+                    (*points)[itIndex] = p;
                 }
-                *it = p;
             }
         }
+
         // Create vectors to keep track of data needed to compute means
-        std::vector<int> nPoints;
-        std::vector<double> sumX, sumY, sumZ;
-        #pragma omp single
-        for (int j = 0; j < k; ++j)
-        {
-            //this simply initializes the vectors to 0
-            nPoints.push_back(0);
-            sumX.push_back(0.0);
-            sumY.push_back(0.0);
-            sumZ.push_back(0.0);
-        }
+        std::vector<int> nPoints(k, 0);
+        std::vector<double> sumX(k, 0.0), sumY(k, 0.0), sumZ(k, 0.0);
+
         // Iterate over points to append data to centroids
-        #pragma omp for
-        for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
+        #pragma omp parallel num_threads(thread_count)
         {
-            int clusterId = it->cluster;
-            nPoints[clusterId] += 1;
-            sumX[clusterId] += it->x;
-            sumY[clusterId] += it->y;
-            sumZ[clusterId] += it->z;
-            it->minDist = std::numeric_limits<double>::max(); // reset distance
-        }
-        // Compute the new centroids
-        #pragma omp for
-        for (std::vector<Point>::iterator c = begin(centroids); c != end(centroids); ++c)
-        {
-            int clusterId = c - begin(centroids);
-            c->x = sumX[clusterId] / nPoints[clusterId];
-            c->y = sumY[clusterId] / nPoints[clusterId];
-            c->z = sumZ[clusterId] / nPoints[clusterId];
-        }
+            #pragma omp for
+            for (int itIndex = 0; itIndex < points->size(); ++itIndex)
+            {
+                int clusterId = (*points)[itIndex].cluster;
+                #pragma omp atomic
+                nPoints[clusterId] += 1;
+                #pragma omp atomic
+                sumX[clusterId] += (*points)[itIndex].x;
+                #pragma omp atomic
+                sumY[clusterId] += (*points)[itIndex].y;
+                #pragma omp atomic
+                sumZ[clusterId] += (*points)[itIndex].z;
+                (*points)[itIndex].minDist = std::numeric_limits<double>::max(); // reset distance
+            }
+
+            // Compute the new centroids
+            #pragma omp for
+            for (int cIndex = 0; cIndex < k; ++cIndex)
+            {
+                int clusterId = cIndex;
+                centroids[clusterId].x = sumX[clusterId] / nPoints[clusterId];
+                centroids[clusterId].y = sumY[clusterId] / nPoints[clusterId];
+                centroids[clusterId].z = sumZ[clusterId] / nPoints[clusterId];
+            }
         }
     }
-    // Write to csv
-    // std::cout << "Writing to CSV" << std::endl;
-    // std::ofstream myfile;
-    // myfile.open("output_shared_cpu.csv");
-    // myfile << "x,y,z,c" << std::endl;
-    // for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
-    // {
-    //     myfile << it->x << "," << it->y << "," << it->z << "," << it->cluster << std::endl;
-    // }
-    // myfile.close();
+    return *points;
+}
+
+
+
+void write_csv(std::vector<Point> *points){
+    std::ofstream myfile;
+    myfile.open("output_distributed_cpu.csv");
+    myfile << "x,y,z,c" << std::endl;
+    printf("writing...");
+    for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
+    {
+        myfile << it->x << "," << it->y << "," << it->z << "," << it->cluster << std::endl;
+    }
+    myfile.close();
 }
 
 int main(int argc, char* argv[])
@@ -190,18 +197,15 @@ int main(int argc, char* argv[])
         std::cout << "Usage: <number of threads>" << std::endl;
         return 0;
     }
-    //int thread_count = std::stoi(argv[1]);
-    std::vector<Point> points = readcsv(/*thread_count*/);
+    int thread_count = std::stoi(argv[1]);
+    std::vector<Point> points = readcsv();
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
-    for (size_t i = 2; i < 8; i++)
-    {
         clock_t start_time = clock();
-        kMeansClustering(&points, 100, 5, i);
+        kMeansClustering(&points, 100, 5, thread_count);
         clock_t end_time = clock();
+        write_csv(&points);
 
-        double iteration_time = static_cast<double>(end_time - start_time) / CLOCKS_PER_SEC;
-        printf("%f ", iteration_time);
-    }
-    
+        double iteration_time = static_cast<double>(end_time - start_time) / CLOCKS_PER_SEC / thread_count;
+        printf("%f\n", iteration_time);    
     std::cout << "Finished successfully" << std::endl;
 }
