@@ -240,7 +240,7 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
 
 void write_csv(std::vector<Point> *points){
     std::ofstream myfile;
-    myfile.open("output.csv");
+    myfile.open("output_distributed_cpu.csv");
     myfile << "x,y,z,c" << std::endl;
     printf("writing...");
     for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
