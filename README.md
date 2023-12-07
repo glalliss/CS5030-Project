@@ -81,30 +81,33 @@ MPI had a large improvement over the serial version. We can see that as the numb
 
 <!-- - 1 vs 2 vs 3 (note: you don't need a scaling study for GPUs, you can look instead at different block/tile size) -->
   Timimg results for shared memory GPU
-    | Block Size | Time(secs) |
-    | --- | --- |
-    | 16 | 57.5286 |
-    | 32 | 57.5273 |
-    | 64 | 57.5267 |
-    | 128 | 57.5132 | 
-    | 256 | 57.5223 |
+
+| Block Size | Time(secs) |
+| --- | --- |
+| 16 | 57.5286 |
+| 32 | 57.5273 |
+| 64 | 57.5267 |
+| 128 | 57.5132 | 
+| 256 | 57.5223 |
 
   The shared memory GPU donot improve the timing much. This might be due to the various overheads involved as we had to initialize three kernels for the task.
 <!-- - 4 vs 5  -->
   Current architecture -> 1 node(2 cpu cores and 2 gpu devices)
   Block size = 128
   Timimg results for distributed memory GPU
-    | Number of Process | Time(secs) |
-    | --- | --- |
-    | 1 | 58.1509 |
-    | 2 | 23.3203 |
+
+| Number of Process | Time(secs) |
+| --- | --- |
+| 1 | 58.1509 |
+| 2 | 23.3203 |
   
   Block size = 256
   Timimg results for distributed memory GPU
-    | Number of Process | Time(secs) |
-    | --- | --- |
-    | 1 | 58.09 |
-    | 2 | 23.3111 |
+
+| Number of Process | Time(secs) |
+| --- | --- |
+| 1 | 58.09 |
+| 2 | 23.3111 |
 
   We can see that as the number of processes increase the time taken decreases for the distributed memory GPU.
   
