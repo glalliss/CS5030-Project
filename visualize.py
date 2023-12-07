@@ -26,10 +26,10 @@ inputCSV3 = "output_shared_gpu.csv"
 outputPNG3 = "5_output_shared_gpu_100.png"
 inputCSV4 = "output_distributed_cpu.csv"
 outputPNG4 = "5_output_distributed_cpu_100.png"
-# inputCSV5 = "output_distributed_gpu.csv"
-# outputPNG5 = "5_output_distributed_gpu_100.png"
+inputCSV5 = "output_distributed_gpu.csv"
+outputPNG5 = "5_output_distributed_gpu_100.png"
 visualize(inputCSV1, outputPNG1)
 visualize(inputCSV2, outputPNG2)
 visualize(inputCSV3, outputPNG3)
 visualize(inputCSV4, outputPNG4)
-# visualize(inputCSV5, outputPNG5)
+visualize(inputCSV5, outputPNG5)
