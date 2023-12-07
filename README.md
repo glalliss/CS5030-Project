@@ -17,10 +17,10 @@
 
 ## 3. Parallel shared memory GPU
 - Code with instructions on how to build and execute all the implementations
-    - 
+    - nvcc kmeans.cu -o kmeans
+    - ./kmeans
 - Description the approach used for each of the following implementations
-    - 
-
+    - Using cuda we created three kernels to do the kmeans clustering. assignPointsToClusters(kernel function to assign clusters to points), computeNewCentroids(helper kernel function to compute the mean for each cluster) and updateNewCentroids(kernel function to compute the mean for each cluster and update its centroid). kmeans.cu utilizes global gpu memory. The kmeans algorithm is run for 100 epochs and for k = 5.
 ## 4. Distributed memory CPU
 - Code with instructions on how to build and execute all the implementations
     - $ mpic++ mpi_cpu.cpp -o mpi
@@ -30,7 +30,11 @@
 
 ## 5. Distributed memory GPU
 - Code with instructions on how to build and execute all the implementations
-    - 
+    - module load cuda/12.
+    - module load gcc/8.5.0
+    - module load openmpi
+    - nvcc -I/usr/mpi/gcc/openmpi-1.4.6/include -L/usr/mpi/gcc/openmpi-1.4.6/lib -lmpi kmeans_mpi_gpu.cu -o kmeans_mpi
+      use the prefix /uufs/chpc.utah.edu/sys/spack/v019/linux-rocky8-nehalem/gcc-8.5.0/openmpi-4.1.4-4a4yd73rjd4bjfpndftt2z22ljffgy56/ instead of /usr/mpi/gcc/openmpi-1.4.6/. You can use the command ompi_info to get your prefix.
 - Description the approach used for each of the following implementations
     - 
 
@@ -52,12 +56,6 @@ All of these were ran on 100 epochs
 
 There is probably an issue with our implementation that is making it take this long. Based on this trend, it is possible that an even higher number of cores would begin to show impovement over the serial version.
 
-GPU:
-
-
-
-
-
 MPI: 
 
 | Number of cores | Time for mpi section |
@@ -71,7 +69,22 @@ MPI:
 MPI had a large improvement over the serial version. We can see that as the number of cores increased, the speedup obtained decreased.
 
 - 1 vs 2 vs 3 (note: you don't need a scaling study for GPUs, you can look instead at different block/tile size)
+  Timimg results for shared memory GPU
+    | Block Size | Time(secs) |
+    | --- | --- |
+    | 16 | 57.5286 |
+    | 32 | 57.5273 |
+    | 64 | 57.5267 |
+    | 128 | 57.5132 | 
+    | 256 | 57.5223 |
 - 4 vs 5
+  Timimg results for shared memory GPU
+    | Number of Process | Time(secs) |
+    | --- | --- |
+    | 1 | 58.1139 |
+    | 2 | 29.9078 |
+    | 3 | 57.5267 |
+    | 4 | 57.5132 |
 
 ## Validation Function
 - Check that the result from parallel implementations is equal to the serial output implementation. Only run this after producing output from all the other programs.
