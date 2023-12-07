@@ -14,7 +14,6 @@ const int k = 5;
 const int epochs = 100;
 const int TILE_WIDTH = 256;
 struct Point {
-    // ... (same as in the original code)
     double x, y, z; // coordinates
     int cluster;    // no default cluster
     double minDist; // default infinite distance to nearest cluster
@@ -63,13 +62,6 @@ __global__ void assignPointsToClusterstiled(Point* points, int numPoints, Point*
 __global__ void computeNewCentroids(Point* points, int numPoints, Point* centroids, int k, int* nPoints, double* sumX, double* sumY, double* sumZ) {
     int clusterId = blockIdx.x * blockDim.x + threadIdx.x;
     if (clusterId < k) {
-        /*
-        int clusterId = points[index].cluster;
-        nPoints[clusterId] += 1;
-        sumX[clusterId] += points[index].x;
-        sumY[clusterId] += points[index].y;
-        sumZ[clusterId] += points[index].z;
-        */
         for (int index = 0; index < numPoints ; index++)
         {
             if(points[index].cluster == clusterId){
@@ -91,16 +83,6 @@ __global__ void updateNewCentroids(Point* centroids,int* nPoints, double* sumX, 
     centroids[clusterId].x = sumX[clusterId] / nPoints[clusterId];
     centroids[clusterId].y = sumY[clusterId] / nPoints[clusterId];
     centroids[clusterId].z = sumZ[clusterId] / nPoints[clusterId];
-
-/*
-    for (std::vector<Point>::iterator c = centroids->begin(); c != centroids->end(); ++c)
-        {
-            int clusterId = c - centroids->begin();
-            c->x = sumX[clusterId] / nPoints[clusterId];
-            c->y = sumY[clusterId] / nPoints[clusterId];
-            c->z = sumZ[clusterId] / nPoints[clusterId];
-        }
-*/
 }
 
 
@@ -108,7 +90,7 @@ __global__ void updateNewCentroids(Point* centroids,int* nPoints, double* sumX, 
 std::vector<Point> readcsv()
 {
     std::vector<Point> points;
-    std::ifstream file("/uufs/chpc.utah.edu/common/home/u6055261/tracks_features.csv");
+    std::ifstream file("tracks_features.csv");
     std::string line;
     int danceabilityIndex = 9;
     int energyIndex = 10;
@@ -160,7 +142,6 @@ std::vector<Point> readcsv()
 
 
 int main() {
-    // ... (same as in the original code)
     std::vector<Point> data = readcsv();
     std::vector<Point>* points = &data;
 
@@ -232,12 +213,6 @@ int main() {
         updateNewCentroids<<<k, 1>>>(d_centroids,d_nPoints, d_sumX, d_sumY, d_sumZ);
 
         cudaDeviceSynchronize();
-
-
-        // Update centroids on the host
-        //cudaMemcpy(&centroids, d_centroids, sizeof(Point) * k, cudaMemcpyDeviceToHost);
-
-        // ... (same as in the original code)
     }
     cudaMemcpy(points->data(), d_points, sizeof(Point) * n, cudaMemcpyDeviceToHost);
     auto end_time = std::chrono::high_resolution_clock::now();
@@ -245,16 +220,10 @@ int main() {
     long time = elapsed_time.count();
     double secs = ((double)time) / (1000 * 1000);
     std::cout << "Duration : " << secs << std::endl;
-
-    // Update centroids on the host
-    //cudaMemcpy(&centroids, d_centroids, sizeof(Point) * k, cudaMemcpyDeviceToHost);
-    //cudaMemcpy(points->data(), d_points, sizeof(Point) * n, cudaMemcpyDeviceToHost);
-
-    // ... (same as in the original code)
     // Write to csv
     std::cout << "Writing to CSV" << std::endl;
     std::ofstream myfile;
-    myfile.open("output.csv");
+    myfile.open("output_shared_gpu_tiling.csv");
     myfile << "x,y,z,c" << std::endl;
     for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
     {
