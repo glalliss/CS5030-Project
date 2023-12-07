@@ -17,6 +17,7 @@
 
 ## 3. Parallel shared memory GPU
 - Code with instructions on how to build and execute all the implementations
+    - module load cuda/12. 
     - nvcc kmeans.cu -o kmeans
     - ./kmeans
 - Description the approach used for each of the following implementations
@@ -36,7 +37,7 @@
     - nvcc -I/usr/mpi/gcc/openmpi-1.4.6/include -L/usr/mpi/gcc/openmpi-1.4.6/lib -lmpi kmeans_mpi_gpu.cu -o kmeans_mpi
       use the prefix /uufs/chpc.utah.edu/sys/spack/v019/linux-rocky8-nehalem/gcc-8.5.0/openmpi-4.1.4-4a4yd73rjd4bjfpndftt2z22ljffgy56/ instead of /usr/mpi/gcc/openmpi-1.4.6/. You can use the command ompi_info to get your prefix.
 - Description the approach used for each of the following implementations
-    - We use openmpi since it is CUDA aware. From the MPI global communicator we create a local communicator
+    - We use openmpi since it is CUDA aware. From the MPI global communicator we create rank for tha available GPUs so that rank 0 uses device 0 and so on. The basic architecture is that we have 1 node containing n cpu and n gpu cores. So that each CPU has its own GPU to process the k-means algorithm. Process 0 reads the data and sends it to other processes. It also writes the completed data to the output file.
 
 ## Scaling study experiments where you compare implementations:
 All of these were ran on 100 epochs
@@ -79,14 +80,26 @@ MPI had a large improvement over the serial version. We can see that as the numb
     | 64 | 57.5267 |
     | 128 | 57.5132 | 
     | 256 | 57.5223 |
-- 4 vs 5
-  Timimg results for shared memory GPU
+
+  The shared memory GPU donot improve the timing much. This might be due to the various overheads involved as we had to initialize three kernels for the task.
+- 4 vs 5 
+  Current architecture -> 1 node(2 cpu cores and 2 gpu devices)
+  Block size = 128
+  Timimg results for distributed memory GPU
+    | Number of Process | Time(secs) |
+    | --- | --- |
+    | 1 | 58.1509 |
+    | 2 | 23.3203 |
+  
+  Block size = 256
+  Timimg results for distributed memory GPU
     | Number of Process | Time(secs) |
     | --- | --- |
     | 1 | 58.09 |
-    | 2 | 23.3203 |
-    | 3 | 57.5267 |
-    | 4 | 57.5132 |
+    | 2 | 23.3111 |
+
+  We can see that as the number of processes increase the time taken decreases for the distributed memory GPU.
+  
 
 ## Validation Function
 - Check that the result from parallel implementations is equal to the serial output implementation. Only run this after producing output from all the other programs.
