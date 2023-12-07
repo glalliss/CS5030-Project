@@ -68,6 +68,8 @@ MPI:
 
 MPI had a large improvement over the serial version. We can see that as the number of cores increased, the speedup obtained decreased.
 
+# GPU:
+
 - 1 vs 2 vs 3 (note: you don't need a scaling study for GPUs, you can look instead at different block/tile size)
   Timimg results for shared memory GPU
     | Block Size | Time(secs) |
