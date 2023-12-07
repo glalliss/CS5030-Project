@@ -21,7 +21,15 @@
     - nvcc kmeans.cu -o kmeans
     - ./kmeans
 - Description the approach used for each of the following implementations
-    - Using cuda we created three kernels to do the kmeans clustering. assignPointsToClusters(kernel function to assign clusters to points), computeNewCentroids(helper kernel function to compute the mean for each cluster) and updateNewCentroids(kernel function to compute the mean for each cluster and update its centroid). kmeans.cu utilizes global gpu memory. The kmeans algorithm is run for 100 epochs and for k = 5.
+    - Using cuda we created three kernels to do the kmeans clustering. assignPointsToClusters(kernel function to assign clusters to points), computeNewCentroids(helper kernel function to compute the mean for each cluster) and updateNewCentroids(kernel function to compute the mean for each cluster and update its centroid). The grid dimension is set using the BLOCK_SIZE constant. kmeans.cu utilizes global gpu memory. The kmeans algorithm is run for 100 epochs and for k = 5.
+
+(optional code using tiling)
+- Code with instructions on how to build and execute all the implementations
+    - module load cuda/12. 
+    - nvcc kmeans_tiling.cu -o kmeans_tiling
+    - ./kmeans_tiling
+- Description the approach used for each of the following implementations
+    - Same as the one using global memory. It just uses shared memory for the purpose of tiling to read in and manipulate the input data. Tile width is determined by const int TILE_WIDTH.
 ## 4. Distributed memory CPU
 - Code with instructions on how to build and execute all the implementations
     - $ mpic++ mpi_cpu.cpp -o mpi
@@ -37,7 +45,7 @@
     - nvcc -I/usr/mpi/gcc/openmpi-1.4.6/include -L/usr/mpi/gcc/openmpi-1.4.6/lib -lmpi kmeans_mpi_gpu.cu -o kmeans_mpi
       use the prefix /uufs/chpc.utah.edu/sys/spack/v019/linux-rocky8-nehalem/gcc-8.5.0/openmpi-4.1.4-4a4yd73rjd4bjfpndftt2z22ljffgy56/ instead of /usr/mpi/gcc/openmpi-1.4.6/. You can use the command ompi_info to get your prefix.
 - Description the approach used for each of the following implementations
-    - We use openmpi since it is CUDA aware. From the MPI global communicator we create rank for tha available GPUs so that rank 0 uses device 0 and so on. The basic architecture is that we have 1 node containing n cpu and n gpu cores. So that each CPU has its own GPU to process the k-means algorithm. Using cuda we created two kernels to do the kmeans clustering. assignPointsToClusters(kernel function to assign clusters to points) and computeNewCentroids(helper kernel function to compute the mean for each cluster). Each epoch, data must be sent back to process 0 to compute the new centroids. Process 0 reads the data and sends it to other processes. It also writes the completed data to the output file. The kmeans algorithm is run for 100 epochs and for k = 5.
+    - We use openmpi since it is CUDA aware. From the MPI global communicator we create rank for tha available GPUs so that rank 0 uses device 0 and so on. The basic architecture is that we have 1 node containing n cpu and n gpu cores. So that each CPU has its own GPU to process the k-means algorithm. Using cuda we created two kernels to do the kmeans clustering. assignPointsToClusters(kernel function to assign clusters to points) and computeNewCentroids(helper kernel function to compute the mean for each cluster). Each epoch, data must be sent back to process 0 to compute the new centroids. Process 0 reads the data and sends it to other processes. It also writes the completed data to the output file. The kmeans algorithm is run for 100 epochs and for k = 5. We can also change the block sizes by varying the const int BLOCK_SIZE value.
 
 ## Scaling study experiments where you compare implementations:
 All of these were ran on 100 epochs
