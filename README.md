@@ -36,7 +36,7 @@
     - nvcc -I/usr/mpi/gcc/openmpi-1.4.6/include -L/usr/mpi/gcc/openmpi-1.4.6/lib -lmpi kmeans_mpi_gpu.cu -o kmeans_mpi
       use the prefix /uufs/chpc.utah.edu/sys/spack/v019/linux-rocky8-nehalem/gcc-8.5.0/openmpi-4.1.4-4a4yd73rjd4bjfpndftt2z22ljffgy56/ instead of /usr/mpi/gcc/openmpi-1.4.6/. You can use the command ompi_info to get your prefix.
 - Description the approach used for each of the following implementations
-    - 
+    - We use openmpi since it is CUDA aware. From the MPI global communicator we create a local communicator
 
 ## Scaling study experiments where you compare implementations:
 All of these were ran on 100 epochs
@@ -83,8 +83,8 @@ MPI had a large improvement over the serial version. We can see that as the numb
   Timimg results for shared memory GPU
     | Number of Process | Time(secs) |
     | --- | --- |
-    | 1 | 58.1139 |
-    | 2 | 29.9078 |
+    | 1 | 58.09 |
+    | 2 | 23.3203 |
     | 3 | 57.5267 |
     | 4 | 57.5132 |
 
