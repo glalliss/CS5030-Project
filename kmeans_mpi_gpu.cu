@@ -52,8 +52,7 @@ void createPointType(MPI_Datatype *type) {
 std::vector<Point> readcsv()
 {
     std::vector<Point> points;
-    std::ifstream file("/uufs/chpc.utah.edu/common/home/u6055261/tracks_features.csv");
-    // std::ifstream file("tracks_features.csv");
+    std::ifstream file("tracks_features.csv");
     std::string line;
     int danceabilityIndex = 9;
     int energyIndex = 10;
@@ -316,7 +315,7 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
 
 void write_csv(std::vector<Point> *points){
     std::ofstream myfile;
-    myfile.open("output_distributed_cpu.csv");
+    myfile.open("output_distributed_gpu.csv");
     myfile << "x,y,z,c" << std::endl;
     printf("writing...");
     for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
