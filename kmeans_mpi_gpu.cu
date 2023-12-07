@@ -1,14 +1,5 @@
-// Adapted from https://reasonabledeviations.com/2019/10/02/k-means-in-cpp/
-// Dataset from https://www.kaggle.com/datasets/rodolfofigueroa/spotify-12m-songs
-
-/*
-seg fault searching:
-- Type is correct
-- My data count is accurate
-- The sendcounts add up to the total data count
-- Points.data has no problem accessing all items (tested with for loop)
-- Examples online use vector.data the same way I do
-*/
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
 #include <ctime>
 #include <fstream>
 #include <iostream>
@@ -18,8 +9,10 @@ seg fault searching:
 #include <string>
 #include <vector>
 #include <mpi.h>
+#include <cmath>
+#include <chrono>
 
-
+const int BLOCk_SIZE = 128;
 struct Point
 {
     double x, y, z; // coordinates
@@ -30,11 +23,6 @@ struct Point
         x(0.0), y(0.0), z(0.0), cluster(-1), minDist(std::numeric_limits<double>::max()) {}
     Point(double x, double y, double z) :
         x(x), y(y), z(z), cluster(-1), minDist(std::numeric_limits<double>::max()) {}
-    // Computes the (square) euclidean distance between this point and another
-    double distance(Point p)
-    {
-        return (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y) + (p.z - z) * (p.z - z);
-    }
 };
 
 void createPointType(MPI_Datatype *type) {
@@ -113,6 +101,56 @@ std::vector<Point> readcsv()
     return points;
 }
 
+// Computes the (square) euclidean distance between this point and another
+__device__ double distance(Point p1, Point p2) {
+    return (p1.x - p2.x) * (p1.x - p2.x) +
+           (p1.y - p2.y) * (p1.y - p2.y) +
+           (p1.z - p2.z) * (p1.z - p2.z);
+}
+
+// kernel functiin to assign clusters to points
+__global__ void assignPointsToClusters(Point* points, int numPoints, Point* centroids, int k, double maxout) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index < numPoints) {
+        double minDist = maxout;
+        int clusterId = -1;
+
+        for (int i = 0; i < k; ++i) {
+            double dist = distance(points[index], centroids[i]);
+            if (dist < minDist) {
+                minDist = dist;
+                clusterId = i;
+            }
+        }
+
+        points[index].minDist = minDist;
+        points[index].cluster = clusterId;
+    }
+}
+
+// helper kernel function to compute the mean for each cluster
+__global__ void computeNewCentroids(Point* points, int numPoints, Point* centroids, int k, int* nPoints, double* sumX, double* sumY, double* sumZ) {
+    int clusterId = blockIdx.x * blockDim.x + threadIdx.x;
+    if (clusterId < k) {
+        /*
+        int clusterId = points[index].cluster;
+        nPoints[clusterId] += 1;
+        sumX[clusterId] += points[index].x;
+        sumY[clusterId] += points[index].y;
+        sumZ[clusterId] += points[index].z;
+        */
+        for (int index = 0; index < numPoints ; index++)
+        {
+            if(points[index].cluster == clusterId){
+                nPoints[clusterId] += 1;
+                sumX[clusterId] += points[index].x;
+                sumY[clusterId] += points[index].y;
+                sumZ[clusterId] += points[index].z;
+
+            }
+        }
+    }
+}
 
 
 
@@ -139,41 +177,63 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
         }
     }
     MPI_Bcast( centroid_array , k , mpi_point , 0 , comm);
+
+     // Create vectors to keep track of data needed to compute means
+
+    int nPoints[k];
+    int nPoints_global[k];
+    double sumX[k];
+    double sumY[k];
+    double sumZ[k];
+    double sumX_global[k];
+    double sumY_global[k];
+    double sumZ_global[k];
+
+
+
+    // Initialize arrays
+    for (int j = 0; j < k; ++j)
+    {
+        nPoints[j] = 0;
+        nPoints_global[j] = 0;
+        sumX_global[j] = 0.0;
+        sumY_global[j] = 0.0;
+        sumZ_global[j] = 0.0;
+        sumX[j] = 0.0;
+        sumY[j] = 0.0;
+        sumZ[j] = 0.0;
+    }
+
+    // Allocate GPU memory
+    Point* d_points;
+    cudaMalloc((void**)&d_points, sizeof(Point) * n);
+    cudaMemcpy(d_points, points->data(), sizeof(Point) * n, cudaMemcpyHostToDevice);
+
+    Point* d_centroids;
+    cudaMalloc((void**)&d_centroids, sizeof(Point) * k);
+    //cudaMemcpy(d_centroids, centroids->data(), sizeof(Point) * k, cudaMemcpyHostToDevice);
+
+    int* d_nPoints;
+    cudaMalloc((void**)&d_nPoints, sizeof(int) * k);
+    cudaMemset(d_nPoints, 0, sizeof(int) * k);
+
+    double* d_sumX;
+    cudaMalloc((void**)&d_sumX, sizeof(double) * k);
+    cudaMemset(d_sumX, 0, sizeof(double) * k);
+
+    double* d_sumY;
+    cudaMalloc((void**)&d_sumY, sizeof(double) * k);
+    cudaMemset(d_sumY, 0, sizeof(double) * k);
+
+    double* d_sumZ;
+    cudaMalloc((void**)&d_sumZ, sizeof(double) * k);
+    cudaMemset(d_sumZ, 0, sizeof(double) * k);
+
+
     // Run algorithm however many epochs specified
     for (int i = 0; i < epochs; ++i)
     {
-        std::vector<Point> centroids(centroid_array, centroid_array + k);        
-        if (rank == 0){
-        }
-        // For each centroid, compute distance from centroid to each point and update point's minDist and cluster if necessary
-        for (std::vector<Point>::iterator c = begin(centroids); c != end(centroids); ++c)
-        {
-            //This line computes the cluster that the points will all be compared to in the nested loop
-            int clusterId = c - begin(centroids);
-            for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
-            {
-                Point p = *it;
-                double dist = c->distance(p);
-                if (dist < p.minDist)
-                {
-                    p.minDist = dist;
-                    p.cluster = clusterId;
-                }
-                *it = p;
-            }
-            //printf("%d done with cluster %d\n", rank, clusterId);
-        }
-        // Create vectors to keep track of data needed to compute means
-
-        int nPoints[k];
-        int nPoints_global[k];
-        double sumX[k];
-        double sumY[k];
-        double sumZ[k];
-        double sumX_global[k];
-        double sumY_global[k];
-        double sumZ_global[k];
-
+        
         // Initialize arrays
         for (int j = 0; j < k; ++j)
         {
@@ -186,20 +246,38 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
             sumY[j] = 0.0;
             sumZ[j] = 0.0;
         }
-
-
-        // Iterate over points to append data to centroids
-        for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
-        {
-            int clusterId = it->cluster;
-            nPoints[clusterId] += 1;
-            sumX[clusterId] += it->x;
-            sumY[clusterId] += it->y;
-            sumZ[clusterId] += it->z;
-            it->minDist = std::numeric_limits<double>::max(); // reset distance
+        std::vector<Point> centroids(centroid_array, centroid_array + k);
+        cudaMemcpy(d_centroids, centroids.data(), sizeof(Point) * k, cudaMemcpyHostToDevice);        
+        if (rank == 0){
+            printf("Starting epoch %d.\n", i);
         }
 
-        // Use the arrays as needed
+        cudaDeviceSynchronize();
+        // Assign points to clusters
+        assignPointsToClusters<<<ceil(static_cast<double>(n) / BLOCk_SIZE), BLOCk_SIZE>>>(d_points, n, d_centroids, k, std::numeric_limits<double>::max());
+
+        // Synchronize to ensure the previous kernel is finished
+        cudaDeviceSynchronize();
+
+        // Compute new centroids
+        cudaMemset(d_nPoints, 0, sizeof(int) * k);
+        cudaMemset(d_sumX, 0, sizeof(double) * k);
+        cudaMemset(d_sumY, 0, sizeof(double) * k);
+        cudaMemset(d_sumZ, 0, sizeof(double) * k);
+
+        computeNewCentroids<<<1,k>>>(d_points, n, d_centroids, k, d_nPoints, d_sumX, d_sumY, d_sumZ);
+
+        // Synchronize to ensure the previous kernel is finished
+        cudaDeviceSynchronize();
+
+        cudaMemcpy(points->data(), d_points, sizeof(Point) * n, cudaMemcpyDeviceToHost);
+
+        cudaMemcpy(&sumX, d_sumX, sizeof(double) * k, cudaMemcpyDeviceToHost);
+        cudaMemcpy(&sumY, d_sumY, sizeof(double) * k, cudaMemcpyDeviceToHost);
+        cudaMemcpy(&sumZ, d_sumZ, sizeof(double) * k, cudaMemcpyDeviceToHost);
+        cudaMemcpy(&nPoints, d_nPoints, sizeof(int) * k, cudaMemcpyDeviceToHost);
+
+        cudaDeviceSynchronize();
 
         
 
@@ -230,13 +308,14 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
         centroids.clear();
         MPI_Bcast(centroid_array, k, mpi_point, 0, comm);
     }
+    printf("Kmeans complete! \n");
     return *points;
     // Write to csv
 }
 
 void write_csv(std::vector<Point> *points){
     std::ofstream myfile;
-    myfile.open("output_distributed_cpu.csv");
+    myfile.open("output_distributed_gpu.csv");
     myfile << "x,y,z,c" << std::endl;
     printf("writing...");
     for (std::vector<Point>::iterator it = points->begin(); it != points->end(); ++it)
@@ -259,6 +338,11 @@ int main()
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Comm_rank(comm , &my_rank);
     MPI_Comm_size(comm, &comm_size);
+    std::cout << "com size" << comm_size <<std::endl;
+    int num_devices = 0;
+    cudaGetDeviceCount(&num_devices);
+    std::cout << "devices : " << num_devices <<std::endl;
+    cudaSetDevice(my_rank % num_devices);
     sendcounts = (int*)malloc(comm_size*sizeof(int));
     displs = (int*)malloc(comm_size*sizeof(int));
     int data_size = NUM_DATA/comm_size;
@@ -272,31 +356,33 @@ int main()
     }
     MPI_Datatype mpi_point;
     createPointType(&mpi_point);
-
     if(my_rank == 0){
         all_points = readcsv();
         printf("Done reading data\n");
     }
-    
-    double start_time = MPI_Wtime();
+
+    MPI_Barrier(comm);
+    auto start_time = std::chrono::high_resolution_clock::now();
     std::vector<Point> my_points(sendcounts[my_rank]);
     MPI_Scatterv(all_points.data(), sendcounts, displs, mpi_point, my_points.data(), sendcounts[my_rank], mpi_point, 0, comm);
     // Run k-means with specified number of iterations/epochs and specified number of clusters(k)
-    if(my_rank == 0){
-        printf("Starting k means\n");
-    }
     
     my_points = kMeansClustering(&my_points, 100, 5, my_rank, comm, mpi_point);
     MPI_Gatherv(my_points.data(), sendcounts[my_rank], mpi_point, all_points.data(), sendcounts, displs, mpi_point, 0, comm);
-    double end_time = MPI_Wtime();
+    printf("Gather successful %d \n", my_rank);
 
-    double total_time = end_time - start_time;
-    if (my_rank == 1){
-        printf("Time for mpi section: %f\n", total_time);
+    if(my_rank == 0){
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        long time = elapsed_time.count();
+        double secs = ((double)time) / (1000 * 1000);
+        std::cout << "Duration : " << secs << std::endl;
     }
+    
+    
     if(my_rank == 0){
         write_csv(&all_points);
     }
+    
     MPI_Finalize();
-
 }

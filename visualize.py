@@ -18,8 +18,18 @@ def visualize(output_csv, output_png):
     plt.savefig(output_png)
 
 # visualize([output_csv="output_[HPC_type].csv"], [output_png="[k]_output_[type]_[epochs].png"])
-visualize("output_serial.csv", "5_output_serial_500.png")
-visualize("output_shared_cpu.csv", "5_output_shared_cpu_500.png")
-visualize("output_shared_gpu.csv", "5_output_shared_gpu_500.png")
-visualize("output_distributed_cpu.csv", "5_output_distributed_cpu_500.png")
-visualize("output_distributed_gpu.csv", "5_output_distributed_gpu_500.png")
+inputCSV1 = "output_serial.csv"
+outputPNG1 = "5_output_serial_100.png"
+inputCSV2 = "output_shared_cpu.csv"
+outputPNG2 = "5_output_shared_cpu_100.png"
+inputCSV3 = "output_shared_gpu.csv"
+outputPNG3 = "5_output_shared_gpu_100.png"
+inputCSV4 = "output_distributed_cpu.csv"
+outputPNG4 = "5_output_distributed_cpu_100.png"
+# inputCSV5 = "output_distributed_gpu.csv"
+# outputPNG5 = "5_output_distributed_gpu_100.png"
+visualize(inputCSV1, outputPNG1)
+visualize(inputCSV2, outputPNG2)
+visualize(inputCSV3, outputPNG3)
+visualize(inputCSV4, outputPNG4)
+# visualize(inputCSV5, outputPNG5)
