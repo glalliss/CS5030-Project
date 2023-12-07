@@ -64,7 +64,6 @@ void createPointType(MPI_Datatype *type) {
 std::vector<Point> readcsv()
 {
     std::vector<Point> points;
-    //std::ifstream file("tracks_features.csv");
     std::ifstream file("tracks_features.csv");
     std::string line;
     int danceabilityIndex = 9;
