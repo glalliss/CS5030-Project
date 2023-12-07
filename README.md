@@ -50,10 +50,10 @@
 ## Scaling study experiments where you compare implementations:
 All of these were ran on 100 epochs
 
-# Serial: 
+### Serial: 
 32.126825 seconds
 
-# OpenMP:
+### OpenMP:
 
 | Number of cores | Time for mpi section |
 | --- | --- |
@@ -65,7 +65,7 @@ All of these were ran on 100 epochs
 
 There is probably an issue with our implementation that is making it take this long. Based on this trend, it is possible that an even higher number of cores would begin to show impovement over the serial version.
 
-MPI: 
+### MPI: 
 
 | Number of cores | Time for mpi section |
 | --- | --- |
@@ -77,9 +77,9 @@ MPI:
 
 MPI had a large improvement over the serial version. We can see that as the number of cores increased, the speedup obtained decreased.
 
-# GPU:
+### GPU:
 
-- 1 vs 2 vs 3 (note: you don't need a scaling study for GPUs, you can look instead at different block/tile size)
+<!-- - 1 vs 2 vs 3 (note: you don't need a scaling study for GPUs, you can look instead at different block/tile size) -->
   Timimg results for shared memory GPU
     | Block Size | Time(secs) |
     | --- | --- |
@@ -90,7 +90,7 @@ MPI had a large improvement over the serial version. We can see that as the numb
     | 256 | 57.5223 |
 
   The shared memory GPU donot improve the timing much. This might be due to the various overheads involved as we had to initialize three kernels for the task.
-- 4 vs 5 
+<!-- - 4 vs 5  -->
   Current architecture -> 1 node(2 cpu cores and 2 gpu devices)
   Block size = 128
   Timimg results for distributed memory GPU
@@ -119,3 +119,5 @@ MPI had a large improvement over the serial version. We can see that as the numb
     - $ python visualize.py
     - View output png
     - Run AFTER one of the kmeans implementations.
+    - Sample image
+    ![](5_output_serial_100.png)
