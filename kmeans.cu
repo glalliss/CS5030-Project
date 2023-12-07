@@ -53,13 +53,6 @@ __global__ void assignPointsToClusters(Point* points, int numPoints, Point* cent
 __global__ void computeNewCentroids(Point* points, int numPoints, Point* centroids, int k, int* nPoints, double* sumX, double* sumY, double* sumZ) {
     int clusterId = blockIdx.x * blockDim.x + threadIdx.x;
     if (clusterId < k) {
-        /*
-        int clusterId = points[index].cluster;
-        nPoints[clusterId] += 1;
-        sumX[clusterId] += points[index].x;
-        sumY[clusterId] += points[index].y;
-        sumZ[clusterId] += points[index].z;
-        */
         for (int index = 0; index < numPoints ; index++)
         {
             if(points[index].cluster == clusterId){
