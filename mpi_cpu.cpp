@@ -128,7 +128,7 @@ std::vector<Point> kMeansClustering(std::vector<Point>* points, int epochs, int 
     // Randomly initialise centroids
     // The index of the centroid within the centroids vector represents the cluster label.
     //Point* centroid_array = (Point*)malloc(k*sizeof(Point));
-    srand(69);
+    srand(100);
     //std::vector<Point> centroids;
     Point *centroid_array = (Point*)malloc(k*sizeof(Point));
     if (rank == 0){
